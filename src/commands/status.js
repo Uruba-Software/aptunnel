@@ -72,17 +72,21 @@ export function runStatus() {
     const uptime  = pid ? getProcessUptime(pid) : null;
     const conn    = running ? readConnectionInfo(id) : null;
 
-    const statusStr = running ? chalk.green('UP') : chalk.dim('DOWN');
-    const uptimeStr = running ? formatUptime(uptime) : '-';
-    const pidStr    = pid ? String(pid) : '-';
-    const urlStr    = conn?.url ? chalk.dim(conn.url) : '-';
+    const statusLabel = running ? 'UP' : 'DOWN';
+    const statusStr   = running ? chalk.green('UP') : chalk.dim('DOWN');
+    const uptimeStr   = running ? formatUptime(uptime) : '-';
+    const pidStr      = pid ? String(pid) : '-';
+    const urlStr      = conn?.url ? chalk.dim(conn.url) : '-';
+
+    // padEnd doesn't account for invisible ANSI escape chars — pad manually
+    const statusPad = ' '.repeat(Math.max(0, cols.status - statusLabel.length));
 
     const row = [
       db.envAlias.padEnd(cols.env),
       db.handle.padEnd(cols.db),
       db.alias.padEnd(cols.alias),
       String(db.port).padEnd(cols.port),
-      statusStr.padEnd(cols.status + (running ? 9 : 0)), // chalk adds escape chars
+      statusStr + statusPad,
       uptimeStr.padEnd(cols.uptime),
       pidStr.padEnd(cols.pid),
       urlStr,

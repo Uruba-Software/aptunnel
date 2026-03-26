@@ -1,5 +1,5 @@
 import { spawnSync, spawn } from 'child_process';
-import { readFileSync, existsSync, writeFileSync, createWriteStream } from 'fs';
+import { readFileSync, existsSync, writeFileSync, openSync, closeSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 
@@ -166,59 +166,72 @@ export function openTunnel({ dbHandle, environment, port }) {
   return new Promise((resolve, reject) => {
     const identifier = sanitize(dbHandle);
     const logFile    = `/tmp/aptunnel-${identifier}.log`;
-    const pidFile    = `/tmp/aptunnel-${identifier}.pid`;
 
-    const logStream = createWriteStream(logFile, { flags: 'w' });
+    // Open the log file synchronously so we have a real fd to hand to spawn.
+    // createWriteStream has fd=null until 'open' fires; spawn rejects that.
+    const logFd = openSync(logFile, 'w');
 
     const args = ['db:tunnel', dbHandle, '--environment', environment, '--port', String(port)];
     const child = spawn('aptible', args, {
       detached: true,
-      stdio:    ['ignore', logStream, logStream],
+      stdio:    ['ignore', logFd, logFd],
     });
+
+    // Parent no longer needs the fd — the child has its own dup'd copy
+    closeSync(logFd);
 
     child.unref();
 
-    // Save PID immediately
-    try {
-      writeFileSync(pidFile, String(child.pid), { mode: 0o600 });
-    } catch (e) {
-      reject(new Error(`Failed to write PID file: ${e.message}`));
-      return;
-    }
+    // Poll the log file until aptible prints "Connect at" or an error, or we time out.
+    // A fixed 5s wait was too short for slow SSH connections.
+    const POLL_INTERVAL_MS = 500;
+    const TIMEOUT_MS       = 60_000; // 60 seconds max
+    let   elapsed          = 0;
 
-    // Wait ~5 seconds for aptible to establish the tunnel and print connection info
-    setTimeout(async () => {
-      logStream.end();
+    const poll = setInterval(() => {
+      elapsed += POLL_INTERVAL_MS;
 
       let logContent = '';
-      try { logContent = readFileSync(logFile, 'utf8'); } catch { /* ignore */ }
+      try { logContent = readFileSync(logFile, 'utf8'); } catch { /* file not yet created */ }
 
-      // Check for auth / error conditions
       const lower = logContent.toLowerCase();
+
+      // Fatal errors — fail immediately
       if (lower.includes('unauthorized') || lower.includes('token has expired') || lower.includes('not authenticated')) {
+        clearInterval(poll);
         reject(new Error('AUTH_EXPIRED'));
         return;
       }
       if (lower.includes('already in use') || lower.includes('address already in use')) {
+        clearInterval(poll);
         reject(new Error('PORT_IN_USE'));
         return;
       }
 
-      // Verify process is still alive
-      try {
-        process.kill(child.pid, 0);
-      } catch {
+      // Process died unexpectedly
+      try { process.kill(child.pid, 0); } catch {
+        clearInterval(poll);
         reject(new Error(`Tunnel process died. Log:\n${logContent.slice(-500)}`));
         return;
       }
 
-      // Parse connection info from log
-      const conn = parseConnectionInfo(logContent, port);
-      resolve({ pid: child.pid, port, ...conn });
-    }, 5000);
+      // Success: aptible printed the connection URL
+      if (lower.includes('connect at') || lower.includes('connected.')) {
+        clearInterval(poll);
+        const conn = parseConnectionInfo(logContent, port);
+        resolve({ pid: child.pid, port, ...conn });
+        return;
+      }
+
+      // Timed out
+      if (elapsed >= TIMEOUT_MS) {
+        clearInterval(poll);
+        reject(new Error(`Tunnel timed out after ${TIMEOUT_MS / 1000}s. Log:\n${logContent.slice(-500)}`));
+      }
+    }, POLL_INTERVAL_MS);
 
     child.on('error', (err) => {
-      logStream.end();
+      clearInterval(poll);
       reject(new Error(`Failed to spawn aptible: ${err.message}`));
     });
   });
