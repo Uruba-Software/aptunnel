@@ -49,6 +49,11 @@ export function login({ email, password, lifetime = '7d', otp } = {}) {
     if (password) args.push(`--password=${password}`);
     if (otp)      args.push(`--otp=${otp}`);
 
+    // Resume stdin so aptible can receive input (e.g. 2FA OTP prompt).
+    // readline.close() pauses process.stdin; we must unpause it before handing
+    // it to a child process, otherwise the child's read() never returns.
+    process.stdin.resume();
+
     // stdio: 'inherit' is critical — aptible prompts for 2FA interactively
     const child = spawn('aptible', args, { stdio: 'inherit' });
 

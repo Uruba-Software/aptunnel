@@ -37,6 +37,8 @@ export async function runInit(args) {
   console.log('');
 
   // 4. Login (interactive — handles 2FA via stdio: inherit)
+  // Close readline BEFORE spawning aptible so stdin is fully available to the child
+  closeRL();
   const spinner = (await import('ora')).default({ text: 'Logging in to Aptible…' }).start();
   const ok = await login({ email, password });
   if (!ok) {
@@ -173,6 +175,9 @@ export async function runInit(args) {
     },
   };
 
+  // All prompts done — close readline before exiting
+  closeRL();
+
   save(config);
   savePassword(password);
 
@@ -246,34 +251,49 @@ function deduplicateAlias(alias, allDbs) {
 }
 
 // ─── Readline helpers ─────────────────────────────────────────────────────────
+// We use a SINGLE readline interface throughout init and only close it at the
+// very end, right before handing stdin back to the aptible child process.
+// Opening/closing multiple readline interfaces causes process.stdin to be
+// paused between calls, which makes subsequent prompts appear to hang.
+
+let _rl = null;
+
+function getRL() {
+  if (!_rl) {
+    _rl = createInterface({ input: process.stdin, output: process.stdout });
+    // Prevent readline from keeping the event loop alive indefinitely
+    _rl.on('close', () => { _rl = null; });
+  }
+  return _rl;
+}
+
+function closeRL() {
+  if (_rl) {
+    _rl.close();
+    _rl = null;
+  }
+  // Ensure stdin is resumed so child processes can read from it (e.g. aptible 2FA)
+  process.stdin.resume();
+}
 
 function ask(prompt) {
   return new Promise((resolve) => {
-    const rl = createInterface({ input: process.stdin, output: process.stdout });
-    rl.question(prompt, (answer) => {
-      rl.close();
-      resolve(answer);
-    });
+    getRL().question(prompt, (answer) => resolve(answer));
   });
 }
 
 function askSecret(prompt) {
   return new Promise((resolve) => {
-    const rl = createInterface({ input: process.stdin, output: process.stdout });
-
-    // Suppress echoing for password input
+    const rl = getRL();
     process.stdout.write(prompt);
-    rl.stdoutMuted = true;
-
-    // Monkey-patch _writeToOutput to suppress echo
     rl._writeToOutput = function(str) {
       if (!this.stdoutMuted) this.output.write(str);
     };
-
+    rl.stdoutMuted = true;
     rl.question('', (answer) => {
       rl.stdoutMuted = false;
+      rl._writeToOutput = function(str) { this.output.write(str); };
       process.stdout.write('\n');
-      rl.close();
       resolve(answer);
     });
   });

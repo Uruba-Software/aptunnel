@@ -36,6 +36,9 @@ export async function runLogin(args) {
   if (!email)    email    = await ask('Aptible email: ');
   if (!password) password = await askSecret('Aptible password: ');
 
+  // Close readline before handing stdin to aptible (2FA prompt needs raw terminal)
+  closeRL();
+
   const ok = await login({ email, password, lifetime });
 
   if (!ok) {
@@ -82,23 +85,33 @@ function parseFlag(args, flag) {
   return entry ? entry.slice(flag.length + 1) : null;
 }
 
+// Single shared readline — avoids stdin pause issues between consecutive prompts
+let _rl = null;
+function getRL() {
+  if (!_rl) _rl = createInterface({ input: process.stdin, output: process.stdout });
+  return _rl;
+}
+function closeRL() {
+  if (_rl) { _rl.close(); _rl = null; }
+  process.stdin.resume();
+}
+
 function ask(prompt) {
   return new Promise((resolve) => {
-    const rl = createInterface({ input: process.stdin, output: process.stdout });
-    rl.question(prompt, (answer) => { rl.close(); resolve(answer); });
+    getRL().question(prompt, (answer) => resolve(answer));
   });
 }
 
 function askSecret(prompt) {
   return new Promise((resolve) => {
-    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    const rl = getRL();
     process.stdout.write(prompt);
-    rl.stdoutMuted = true;
     rl._writeToOutput = function(str) { if (!this.stdoutMuted) this.output.write(str); };
+    rl.stdoutMuted = true;
     rl.question('', (answer) => {
       rl.stdoutMuted = false;
+      rl._writeToOutput = function(str) { this.output.write(str); };
       process.stdout.write('\n');
-      rl.close();
       resolve(answer);
     });
   });
