@@ -1,0 +1,44 @@
+#!/bin/sh
+# Mock aptible CLI for testing — simulates aptible-cli output shapes.
+# Set MOCK_TUNNEL_DELAY (seconds) to control how long db:tunnel sleeps.
+DELAY="${MOCK_TUNNEL_DELAY:-3600}"
+
+case "$1" in
+  version)
+    echo "aptible-cli v0.24.2 toolbelt"
+    exit 0
+    ;;
+  environment:list)
+    echo '[{"id":1,"handle":"my-env-dev-abc123"},{"id":2,"handle":"my-env-staging-def456"}]'
+    exit 0
+    ;;
+  db:list)
+    echo '[{"id":10,"handle":"mydb-dev","type":"postgresql","status":"provisioned"},{"id":11,"handle":"mydb-dev-redis","type":"redis","status":"provisioned"}]'
+    exit 0
+    ;;
+  db:tunnel)
+    echo "Creating postgresql tunnel to mydb-dev..."
+    echo "Connect at postgresql://aptible:mockpassword123@localhost.aptible.in:55554/db"
+    echo "Or, use the following arguments:"
+    echo "* Host: localhost.aptible.in"
+    echo "* Port: 55554"
+    echo "* Username: aptible"
+    echo "* Password: mockpassword123"
+    echo "* Database: db"
+    echo "Connected. Ctrl-C to close connection."
+    sleep "$DELAY"
+    exit 0
+    ;;
+  login)
+    echo "Token written to $HOME/.aptible/tokens.json"
+    exit 0
+    ;;
+  apps)
+    echo '[{"id":20,"handle":"myapp-dev","status":"running"}]'
+    exit 0
+    ;;
+  *)
+    echo "Unknown command: $1" >&2
+    exit 1
+    ;;
+esac

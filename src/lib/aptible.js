@@ -1,13 +1,19 @@
 import { spawnSync, spawn } from 'child_process';
 import { readFileSync, existsSync, writeFileSync, openSync, closeSync } from 'fs';
-import { homedir } from 'os';
+import { homedir, tmpdir } from 'os';
 import { join } from 'path';
+
+function getTempDir() {
+  return process.env.APTUNNEL_TEMP_DIR ?? tmpdir();
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function run(args, opts = {}) {
-  const env = { ...process.env, ...opts.env };
-  return spawnSync('aptible', args, { encoding: 'utf8', env, ...opts });
+  // Destructure to avoid `...opts` overwriting the merged env object below
+  const { env: envOverrides = {}, ...spawnOpts } = opts;
+  const env = { ...process.env, ...envOverrides };
+  return spawnSync('aptible', args, { encoding: 'utf8', env, ...spawnOpts });
 }
 
 function parseJson(raw) {
@@ -165,7 +171,7 @@ export function listDatabases(environmentHandle) {
 export function openTunnel({ dbHandle, environment, port }) {
   return new Promise((resolve, reject) => {
     const identifier = sanitize(dbHandle);
-    const logFile    = `/tmp/aptunnel-${identifier}.log`;
+    const logFile    = join(getTempDir(), `aptunnel-${identifier}.log`);
 
     // Open the log file synchronously so we have a real fd to hand to spawn.
     // createWriteStream has fd=null until 'open' fires; spawn rejects that.

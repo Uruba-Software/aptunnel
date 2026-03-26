@@ -1,16 +1,18 @@
 import { readFileSync, writeFileSync, existsSync, unlinkSync, readdirSync } from 'fs';
 import { join } from 'path';
+import { tmpdir } from 'os';
 import { getProcessInfo, getProcessUptime } from './platform.js';
 
-const TMP = process.platform === 'win32'
-  ? (process.env.TEMP ?? 'C:\\Windows\\Temp')
-  : '/tmp';
+// Allow tests to redirect temp files to an isolated directory
+function getTempDir() {
+  return process.env.APTUNNEL_TEMP_DIR ?? tmpdir();
+}
 
 // ─── Path helpers ─────────────────────────────────────────────────────────────
 
-export function pidFilePath(identifier)  { return join(TMP, `aptunnel-${identifier}.pid`); }
-export function logFilePath(identifier)  { return join(TMP, `aptunnel-${identifier}.log`); }
-export function connFilePath(identifier) { return join(TMP, `aptunnel-${identifier}.conn.json`); }
+export function pidFilePath(identifier)  { return join(getTempDir(), `aptunnel-${identifier}.pid`); }
+export function logFilePath(identifier)  { return join(getTempDir(), `aptunnel-${identifier}.log`); }
+export function connFilePath(identifier) { return join(getTempDir(), `aptunnel-${identifier}.conn.json`); }
 
 // ─── PID management ───────────────────────────────────────────────────────────
 
@@ -80,7 +82,7 @@ export function removeConnectionInfo(identifier) {
 export function getAllRunningTunnels() {
   let files;
   try {
-    files = readdirSync(TMP);
+    files = readdirSync(getTempDir());
   } catch {
     return [];
   }

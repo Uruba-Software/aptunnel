@@ -12,7 +12,10 @@
   },
   "scripts": {
     "start": "node bin/aptunnel.js",
-    "test": "node --test test/"
+    "test": "node --test test/lib/*.test.js test/commands/*.test.js",
+    "test:integration": "node --test test/integration/*.test.js",
+    "test:all": "node --test test/lib/*.test.js test/commands/*.test.js test/integration/*.test.js",
+    "test:watch": "node --test --watch test/lib/*.test.js test/commands/*.test.js"
   },
   "keywords": [
     "aptible",

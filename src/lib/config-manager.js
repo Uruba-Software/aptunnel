@@ -4,18 +4,19 @@ import { join, dirname } from 'path';
 import { spawnSync } from 'child_process';
 import yaml from 'js-yaml';
 
-const CONFIG_DIR   = join(homedir(), '.aptunnel');
-const CONFIG_FILE  = join(CONFIG_DIR, 'config.yaml');
-const CREDS_FILE   = join(CONFIG_DIR, '.credentials');
+// Allow tests to redirect config to a temp directory via APTUNNEL_CONFIG_HOME
+function getConfigHome() {
+  return process.env.APTUNNEL_CONFIG_HOME ?? join(homedir(), '.aptunnel');
+}
 
 // ─── Path helpers ─────────────────────────────────────────────────────────────
 
-export function getConfigPath()  { return CONFIG_FILE; }
-export function getCredsPath()   { return CREDS_FILE; }
-export function getConfigDir()   { return CONFIG_DIR; }
+export function getConfigDir()   { return getConfigHome(); }
+export function getConfigPath()  { return join(getConfigHome(), 'config.yaml'); }
+export function getCredsPath()   { return join(getConfigHome(), '.credentials'); }
 
 export function exists() {
-  return existsSync(CONFIG_FILE);
+  return existsSync(getConfigPath());
 }
 
 // ─── Load / Save ──────────────────────────────────────────────────────────────
@@ -26,11 +27,11 @@ export function exists() {
  * @throws if file is missing or unparseable
  */
 export function load() {
-  if (!existsSync(CONFIG_FILE)) {
+  if (!existsSync(getConfigPath())) {
     throw new Error(`Config not found. Run \`aptunnel init\` to set up.`);
   }
   try {
-    const raw = readFileSync(CONFIG_FILE, 'utf8');
+    const raw = readFileSync(getConfigPath(), 'utf8');
     const config = yaml.load(raw);
     if (!config || typeof config !== 'object') {
       throw new Error('Config file is empty or invalid.');
@@ -49,7 +50,7 @@ export function load() {
 export function save(config) {
   ensureConfigDir();
   const raw = yaml.dump(config, { lineWidth: 120, noRefs: true });
-  writeFileSync(CONFIG_FILE, raw, { mode: 0o600 });
+  writeFileSync(getConfigPath(), raw, { mode: 0o600 });
 }
 
 // ─── Credentials ─────────────────────────────────────────────────────────────
@@ -59,9 +60,9 @@ export function save(config) {
  * @returns {string | null}
  */
 export function readPassword() {
-  if (!existsSync(CREDS_FILE)) return null;
+  if (!existsSync(getCredsPath())) return null;
   try {
-    const content = readFileSync(CREDS_FILE, 'utf8');
+    const content = readFileSync(getCredsPath(), 'utf8');
     const match = content.match(/^APTUNNEL_PASSWORD=(.+)$/m);
     return match?.[1]?.trim() ?? null;
   } catch {
@@ -75,14 +76,15 @@ export function readPassword() {
  */
 export function savePassword(password) {
   ensureConfigDir();
-  writeFileSync(CREDS_FILE, `APTUNNEL_PASSWORD=${password}\n`, { mode: 0o600 });
+  const credsPath = getCredsPath();
+  writeFileSync(credsPath, `APTUNNEL_PASSWORD=${password}\n`, { mode: 0o600 });
 
   if (platform() === 'win32') {
     // On Windows chmod doesn't restrict access — use icacls
     try {
       const username = process.env.USERNAME ?? process.env.USER ?? '';
       if (username) {
-        spawnSync('icacls', [CREDS_FILE, '/inheritance:r', '/grant:r', `${username}:(R,W)`], { encoding: 'utf8' });
+        spawnSync('icacls', [credsPath, '/inheritance:r', '/grant:r', `${username}:(R,W)`], { encoding: 'utf8' });
       }
     } catch {
       // icacls unavailable — warn via caller
@@ -238,7 +240,8 @@ export function nextAvailablePort() {
 // ─── Internal ─────────────────────────────────────────────────────────────────
 
 function ensureConfigDir() {
-  if (!existsSync(CONFIG_DIR)) {
-    mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
+  const dir = getConfigHome();
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
   }
 }
