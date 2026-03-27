@@ -14,8 +14,10 @@ warrants a version bump. Use these rules:
 
 ### Steps to follow on every code push
 
-1. **Update `package.json` version** if the change warrants a bump (see table above).
-2. **Commit** all changes (including the version bump) in a single commit.
+1. **Update `package.json` version** FIRST if the change warrants a bump (see table above).
+   - CRITICAL: The version in `package.json` MUST match the git tag. Always bump
+     the version in the same commit as the code change, never after.
+2. **Commit** all changes (code + version bump) in a single commit.
    - Commit author: always `biyro02` (the configured git user) — do NOT add `Co-Authored-By` lines.
 3. **Push** to `main`.
 4. **If version was bumped**: create and push a matching git tag so CI publishes to npm automatically:
@@ -23,7 +25,11 @@ warrants a version bump. Use these rules:
    git tag v<new-version>
    git push origin v<new-version>
    ```
-   Example: after bumping to `1.0.1` → `git tag v1.0.1 && git push origin v1.0.1`
+   Example: bumping to `1.0.1`:
+   - Update package.json → `"version": "1.0.1"`
+   - `git add package.json && git commit -m "fix: ... (bumps 1.0.0 → 1.0.1)"`
+   - `git push origin main`
+   - `git tag v1.0.1 && git push origin v1.0.1`
 
 CI will then run all tests (9 combinations: 3 OS × 3 Node versions) and publish
 to npm automatically if everything passes.
