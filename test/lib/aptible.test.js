@@ -1,9 +1,10 @@
 import { describe, it, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
-import { injectMockAptible, restorePath, createTestEnv } from '../helpers.js';
+import { injectMockAptible, restorePath, createTestEnv, isWindows } from '../helpers.js';
 
 // All tests in this file use the mock aptible CLI — no real aptible needed.
 
@@ -127,9 +128,18 @@ describe('aptible (mocked)', () => {
 
     after(async () => {
       delete process.env.MOCK_TUNNEL_DELAY;
-      // Kill the mock tunnel process
+      // Kill the mock tunnel process (and its children on Windows, which hold the log file open)
       if (tunnelResult?.pid) {
-        try { process.kill(tunnelResult.pid, 'SIGKILL'); } catch { /* already gone */ }
+        try {
+          if (isWindows) {
+            // taskkill /T kills the entire process tree so timeout.exe also exits,
+            // releasing the log file lock before we try to delete the temp dir.
+            spawnSync('taskkill', ['/F', '/T', '/PID', String(tunnelResult.pid)], { encoding: 'utf8' });
+            await new Promise(r => setTimeout(r, 500));
+          } else {
+            process.kill(tunnelResult.pid, 'SIGKILL');
+          }
+        } catch { /* already gone */ }
       }
       env?.cleanup();
     });

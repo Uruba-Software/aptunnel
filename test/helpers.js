@@ -4,6 +4,7 @@
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 // ─── Platform detection ───────────────────────────────────────────────────────
 
@@ -25,7 +26,7 @@ export function skipOnLinux(t, reason = 'Not applicable on Linux') {
 
 // ─── Mock aptible PATH injection ──────────────────────────────────────────────
 
-export const MOCK_DIR  = path.resolve(import.meta.dirname ?? path.dirname(new URL(import.meta.url).pathname), 'mocks');
+export const MOCK_DIR  = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'mocks');
 const _originalPath    = process.env.PATH;
 
 export function injectMockAptible() {

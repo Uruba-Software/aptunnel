@@ -72,13 +72,16 @@ export function getProcessInfo(pid) {
   const os = detectOS();
 
   if (os === 'windows') {
+    // tasklist is available on all Windows versions; wmic is deprecated/removed in modern Windows.
     const result = spawnSync(
-      'wmic',
-      ['process', 'where', `ProcessId=${pid}`, 'get', 'CommandLine'],
+      'tasklist',
+      ['/FI', `PID eq ${pid}`, '/NH', '/FO', 'CSV'],
       { encoding: 'utf8' }
     );
     if (result.status !== 0 || !result.stdout.trim()) return { running: false, command: null };
-    const lines = result.stdout.trim().split('\n').filter(l => l.trim() && !l.startsWith('CommandLine'));
+    // tasklist outputs "INFO: No tasks..." when PID not found; CSV lines otherwise.
+    const lines = result.stdout.trim().split('\n')
+      .filter(l => l.trim() && !l.toLowerCase().startsWith('info'));
     if (lines.length === 0) return { running: false, command: null };
     return { running: true, command: lines[0].trim() };
   }
@@ -119,28 +122,16 @@ export function getProcessUptime(pid) {
   const os = detectOS();
 
   if (os === 'windows') {
-    // wmic returns CreationDate like: 20240315123456.000000+000
+    // Use PowerShell to get process start time (wmic is deprecated/removed in modern Windows).
     const result = spawnSync(
-      'wmic',
-      ['process', 'where', `ProcessId=${pid}`, 'get', 'CreationDate'],
+      'powershell',
+      ['-NoProfile', '-NonInteractive', '-Command',
+       `$p = Get-Process -Id ${pid} -ErrorAction SilentlyContinue; if ($p) { $p.StartTime.ToUniversalTime().ToString('o') }`],
       { encoding: 'utf8' }
     );
     if (result.status !== 0 || !result.stdout.trim()) return null;
-
-    const lines = result.stdout.trim().split('\n').filter(l => l.trim() && !l.startsWith('CreationDate'));
-    if (lines.length === 0) return null;
-
-    const raw = lines[0].trim();
-    // Parse: YYYYMMDDHHmmss.ffffff+zzz
-    const year   = raw.slice(0, 4);
-    const month  = raw.slice(4, 6);
-    const day    = raw.slice(6, 8);
-    const hour   = raw.slice(8, 10);
-    const minute = raw.slice(10, 12);
-    const second = raw.slice(12, 14);
-    const startDate = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}Z`);
+    const startDate = new Date(result.stdout.trim());
     if (isNaN(startDate.getTime())) return null;
-
     return computeUptime(startDate);
   }
 
