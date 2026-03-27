@@ -16,6 +16,7 @@ warrants a version bump. Use these rules:
 
 1. **Update `package.json` version** if the change warrants a bump (see table above).
 2. **Commit** all changes (including the version bump) in a single commit.
+   - Commit author: always `biyro02` (the configured git user) — do NOT add `Co-Authored-By` lines.
 3. **Push** to `main`.
 4. **If version was bumped**: create and push a matching git tag so CI publishes to npm automatically:
    ```

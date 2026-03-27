@@ -1,6 +1,24 @@
-# aptunnel
+<p align="center">
+  <h1 align="center">aptunnel</h1>
+  <p align="center">Cross-platform Aptible tunnel manager — open, close and monitor multiple database tunnels with short aliases.</p>
+</p>
 
-Cross-platform Aptible tunnel manager. Open, close, and monitor multiple database tunnels with short aliases instead of long Aptible handles.
+<p align="center">
+  <a href="https://www.npmjs.com/package/aptunnel"><img src="https://img.shields.io/npm/v/aptunnel?color=cb3837&label=npm&logo=npm" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/aptunnel"><img src="https://img.shields.io/npm/dm/aptunnel?color=cb3837&logo=npm&label=downloads" alt="npm downloads"></a>
+  <a href="https://github.com/Uruba-Software/aptunnel/actions/workflows/test.yml"><img src="https://github.com/Uruba-Software/aptunnel/actions/workflows/test.yml/badge.svg" alt="CI"></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/node/v/aptunnel?color=339933&logo=node.js&logoColor=white" alt="Node.js version"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/npm/l/aptunnel?color=blue" alt="License"></a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Linux-supported-FCC624?logo=linux&logoColor=black" alt="Linux">
+  <img src="https://img.shields.io/badge/macOS-supported-000000?logo=apple&logoColor=white" alt="macOS">
+  <img src="https://img.shields.io/badge/Windows-supported-0078D4?logo=windows&logoColor=white" alt="Windows">
+  <img src="https://img.shields.io/badge/WSL-supported-4EAA25?logo=gnubash&logoColor=white" alt="WSL">
+</p>
+
+---
 
 ```
 aptunnel dev-db          # open tunnel to dev database
@@ -12,7 +30,7 @@ aptunnel status          # see what's running
 
 ## Requirements
 
-- **Node.js** 18+
+- **[Node.js](https://nodejs.org)** 18+
 - **[Aptible CLI](https://www.aptible.com/docs/cli)** installed and in your PATH
 
 ---
@@ -32,7 +50,7 @@ aptunnel init
 ```
 
 The wizard will:
-1. Verify aptible CLI is installed
+1. Verify Aptible CLI is installed
 2. Log you in (supports 2FA)
 3. Discover all your environments and databases
 4. Auto-assign ports starting at `55550`
@@ -129,18 +147,18 @@ credentials:
   email: you@company.com
 
 defaults:
-  environment: ekare-inc-development-gfpkcova
+  environment: my-env-development
   lifetime: 7d
 
 environments:
-  ekare-inc-development-gfpkcova:
+  my-env-development:
     alias: dev
     databases:
-      ekaredb-dev:
+      mydb-dev:
         alias: dev-db
         port: 55554
         type: postgresql
-      ekaredb-dev-redis:
+      mydb-redis:
         alias: dev-redis
         port: 55555
         type: redis
@@ -154,56 +172,48 @@ tunnel_defaults:
 
 ## Shell Completions
 
-### Auto-install (detects your shell)
-
 ```bash
-aptunnel completions install
+aptunnel completions install       # auto-detects your shell
 ```
 
-### Manual
+Or manually:
 
-**Bash** — add to `~/.bashrc`:
 ```bash
+# Bash — add to ~/.bashrc
 source <(aptunnel completions bash)
-```
 
-**Zsh** — add to `~/.zshrc`:
-```bash
+# Zsh — add to ~/.zshrc
 source <(aptunnel completions zsh)
-```
 
-**Fish** — copy to completions directory:
-```bash
+# Fish
 aptunnel completions fish > ~/.config/fish/completions/aptunnel.fish
 ```
 
-Completions are dynamic — they read your config at runtime so your actual database aliases appear in tab-completion.
+Completions are dynamic — your actual database aliases appear in tab-completion.
 
 ---
 
-## Platform Notes
+## Platform Support
 
-### macOS
-Full support. Install Aptible CLI via Homebrew:
+| Platform | Status | Notes |
+|---|---|---|
+| **Linux** | ✅ Full | `lsof`, `ps`, Unix signals |
+| **macOS** | ✅ Full | Same as Linux |
+| **Windows** | ✅ Full | `netstat`, `tasklist`, `taskkill` |
+| **WSL** | ✅ Full | Treated as Linux, `wslview` for browser |
+
+**Install Aptible CLI:**
+
 ```bash
+# macOS
 brew install aptible/aptible/aptible
-```
 
-### Linux
-Full support. Install Aptible CLI:
-```bash
+# Linux / WSL
 curl -s https://toolbelt.aptible.com/install.sh | bash
+
+# Windows
+# Download from https://www.aptible.com/docs/cli
 ```
-
-### Windows
-Supported with some limitations:
-- Process management uses `taskkill` and `wmic` instead of Unix signals
-- Port detection uses `netstat` instead of `lsof`
-- File permissions use `icacls` for the credentials file
-- Requires Node.js 18+ for Windows
-
-### WSL (Windows Subsystem for Linux)
-Treated as Linux. Browser opening uses `wslview` if available, otherwise falls back to `cmd.exe /c start`.
 
 ---
 
@@ -221,15 +231,15 @@ Pressing **Ctrl+C** while aptunnel is running closes all open tunnels before exi
 
 ## Troubleshooting
 
-**"Aptible CLI not found"** — Install aptible and make sure it's in your PATH. Run `aptible version` to verify.
+**"Aptible CLI not found"** — Install the [Aptible CLI](https://www.aptible.com/docs/cli) and make sure it's in your PATH. Run `aptible version` to verify.
 
 **"Token expired"** — Run `aptunnel login`. aptunnel will attempt auto-relogin on tunnel failures, but a fresh login is the cleanest fix.
 
-**"Port already in use"** — Another process is on that port. Use `--force` to kill it or `--port=<N>` to use a different port.
+**"Port already in use"** — Another process is on that port. Use `--port=<N>` to use a different port or update it with `aptunnel config --set-port dev-db <N>`.
 
 **"Config file is corrupted"** — Delete `~/.aptunnel/config.yaml` and re-run `aptunnel init`.
 
-**Tunnel fails silently** — Check the log file: `cat /tmp/aptunnel-<alias>.log`. Set `DEBUG=1` for verbose output from aptunnel.
+**Tunnel fails silently** — Check the log file: `cat /tmp/aptunnel-<alias>.log`.
 
 ---
 
@@ -237,10 +247,8 @@ Pressing **Ctrl+C** while aptunnel is running closes all open tunnels before exi
 
 1. Fork the repo
 2. Create a branch: `git checkout -b my-feature`
-3. Make your changes
+3. Make your changes and add tests
 4. Open a pull request against `main`
-
-Please keep PRs focused. One feature or fix per PR.
 
 ---
 
