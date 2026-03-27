@@ -120,6 +120,7 @@ function askSecret(prompt) {
         if (char === '\r' || char === '\n') {
           process.stdin.removeListener('data', onData);
           if (isTTY) process.stdin.setRawMode(false);
+          process.stdin.pause();
           process.stdout.write('\n');
           resolve(chars.join(''));
           return;

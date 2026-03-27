@@ -37,15 +37,16 @@ export async function runInit(args) {
   console.log('');
 
   // 4. Login (interactive — handles 2FA via stdio: inherit)
-  // Close readline BEFORE spawning aptible so stdin is fully available to the child
+  // Do NOT show a spinner here: aptible may prompt for a 2FA OTP code and the
+  // spinner output would hide that prompt. Print a plain line instead.
   closeRL();
-  const spinner = (await import('ora')).default({ text: 'Logging in to Aptible…' }).start();
+  console.log('Logging in to Aptible… (enter 2FA code if prompted)');
   const ok = await login({ email, password });
   if (!ok) {
-    spinner.fail('Login failed. Please check your credentials.');
+    logger.error('Login failed. Please check your credentials.');
     process.exit(1);
   }
-  spinner.succeed('Logged in successfully.');
+  logger.success('Logged in successfully.');
   console.log('');
 
   // 5. Discover environments
@@ -303,6 +304,9 @@ function askSecret(prompt) {
         if (char === '\r' || char === '\n') {
           process.stdin.removeListener('data', onData);
           if (isTTY) process.stdin.setRawMode(false);
+          // Pause so Node.js stops consuming keystrokes that belong to child
+          // processes (e.g. aptible login waiting for a 2FA OTP).
+          process.stdin.pause();
           process.stdout.write('\n');
           resolve(chars.join(''));
           return;

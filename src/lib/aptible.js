@@ -58,12 +58,10 @@ export function login({ email, password, lifetime = '7d', otp } = {}) {
     if (password) args.push(`--password=${password}`);
     if (otp)      args.push(`--otp=${otp}`);
 
-    // Resume stdin so aptible can receive input (e.g. 2FA OTP prompt).
-    // readline.close() pauses process.stdin; we must unpause it before handing
-    // it to a child process, otherwise the child's read() never returns.
-    process.stdin.resume();
-
-    // stdio: 'inherit' is critical — aptible prompts for 2FA interactively
+    // stdio: 'inherit' — aptible reads from fd 0 directly at OS level,
+    // independent of Node.js stream state. Do NOT call process.stdin.resume()
+    // here: flowing mode with no listener would consume the user's 2FA keystrokes
+    // before aptible gets them.
     const child = spawn('aptible', args, { stdio: 'inherit', ...SHELL_OPT });
 
     child.on('close', (code) => resolve(code === 0));
