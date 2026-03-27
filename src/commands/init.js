@@ -273,8 +273,9 @@ function closeRL() {
     _rl.close();
     _rl = null;
   }
-  // Ensure stdin is resumed so child processes can read from it (e.g. aptible 2FA)
-  process.stdin.resume();
+  // Do NOT call process.stdin.resume() here. Flowing mode with no listener
+  // discards keystrokes. Child processes (aptible) read from fd 0 directly
+  // at OS level regardless of Node.js stream state.
 }
 
 function ask(prompt) {

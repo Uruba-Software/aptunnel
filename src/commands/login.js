@@ -93,7 +93,6 @@ function getRL() {
 }
 function closeRL() {
   if (_rl) { _rl.close(); _rl = null; }
-  process.stdin.resume();
 }
 
 function ask(prompt) {
