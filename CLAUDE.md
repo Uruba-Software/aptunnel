@@ -32,11 +32,23 @@ to npm automatically if everything passes.
 - Never bump the version for CI-only, doc-only, or test-only changes.
 - Never manually run `npm publish` — let CI handle it via the tag.
 
-## Repository info
-- GitHub: https://github.com/Uruba-Software/aptunnel
-- npm: https://www.npmjs.com/package/aptunnel
+## Accounts & references
+- GitHub org: Uruba-Software (owner: biyro02)
+- GitHub repo: https://github.com/Uruba-Software/aptunnel
+- npm package: https://www.npmjs.com/package/aptunnel
+- npm publisher account: buluad
+- npm token type: Granular Access Token, no 2FA required — stored as `NPM_TOKEN` in GitHub repo secrets
 - Default branch: `main`
 - CI: GitHub Actions (`.github/workflows/test.yml`)
+
+## Key technical decisions & gotchas
+- `shell: true` required on Windows for all `spawn`/`spawnSync('aptible', ...)` calls — `.cmd` files need a shell
+- `pathToFileURL()` required in `bin/aptunnel.js` for Windows ESM compatibility (drive paths like `D:\...` are invalid import specifiers)
+- `wmic` is removed in modern Windows — use `tasklist` for process info, PowerShell for uptime
+- `import.meta.dirname` only available in Node 22+ — use `fileURLToPath(import.meta.url)` for compatibility
+- `node --test` in Node 22 cannot resolve directory paths — always use explicit file list in test scripts
+- `timeout.exe` exits without a TTY on Windows CI — use `process.execPath` with `setTimeout` for cross-platform long-running test processes
+- Tunnel cleanup on Windows: `taskkill /F /T /PID` to kill entire process tree (otherwise log file lock prevents temp dir deletion)
 
 ## Project overview
 Cross-platform Node.js CLI that wraps the Aptible CLI for multi-tunnel
