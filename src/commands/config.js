@@ -26,8 +26,8 @@ export async function runConfig(args) {
   if (setPortArg !== -1) {
     const alias = args[setPortArg + 1];
     const port  = parseInt(args[setPortArg + 2], 10);
-    if (!alias || isNaN(port)) {
-      logger.error('Usage: aptunnel config --set-port <alias> <port>');
+    if (!alias || isNaN(port) || port < 1 || port > 65535) {
+      logger.error('Usage: aptunnel config --set-port <alias> <port>  (port must be 1–65535)');
       process.exit(1);
     }
     setPort(alias, port);

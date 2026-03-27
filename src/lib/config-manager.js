@@ -81,13 +81,14 @@ export function savePassword(password) {
 
   if (platform() === 'win32') {
     // On Windows chmod doesn't restrict access — use icacls
-    try {
-      const username = process.env.USERNAME ?? process.env.USER ?? '';
-      if (username) {
-        spawnSync('icacls', [credsPath, '/inheritance:r', '/grant:r', `${username}:(R,W)`], { encoding: 'utf8' });
+    const username = process.env.USERNAME ?? process.env.USER ?? '';
+    if (username) {
+      const r = spawnSync('icacls', [credsPath, '/inheritance:r', '/grant:r', `${username}:(R,W)`], { encoding: 'utf8' });
+      if (r.status !== 0) {
+        process.stderr.write(`[aptunnel] Warning: could not restrict permissions on credentials file: ${credsPath}\n`);
       }
-    } catch {
-      // icacls unavailable — warn via caller
+    } else {
+      process.stderr.write(`[aptunnel] Warning: could not determine current user — credentials file may not be permission-restricted.\n`);
     }
   }
 }
