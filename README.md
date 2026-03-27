@@ -23,6 +23,7 @@
 ```
 aptunnel dev-db          # open tunnel to dev database
 aptunnel all             # open all configured tunnels
+aptunnel dbs             # list all configured databases
 aptunnel status          # see what's running
 ```
 
@@ -49,13 +50,32 @@ npm install -g aptunnel
 aptunnel init
 ```
 
-The wizard will:
-1. Verify Aptible CLI is installed
-2. Log you in (supports 2FA)
+The setup wizard will:
+
+1. Verify the Aptible CLI is installed
+2. Log you in — supports **2FA** (OTP prompt appears directly in your terminal)
 3. Discover all your environments and databases
-4. Auto-assign ports starting at `55550`
-5. Let you set short aliases (e.g. `dev-db`, `dev-redis`)
-6. Write `~/.aptunnel/config.yaml`
+4. Auto-assign local ports starting at `55550`
+5. Let you customize short aliases (e.g. `dev-db`, `dev-redis`) and ports
+6. Ask which environment to use as the **default** (or skip with `0` for no default)
+7. Write `~/.aptunnel/config.yaml`
+
+**Environment selection during init:**
+
+```
+Available environments:
+  [1] my-company-production-abc123
+  [2] my-company-staging-def456
+  [3] my-company-development-ghi789
+
+Select environments (comma-separated numbers, "all", or press Enter for all): 1,3
+
+Set a default environment (used when no --env flag is given):
+  [1] my-company-production-abc123
+  [2] my-company-development-ghi789
+  [0] None (no default)
+Default environment (0 to skip) [1]:
+```
 
 ---
 
@@ -95,6 +115,22 @@ aptunnel all                       # uses default environment
 aptunnel all --env=staging
 ```
 
+### List databases
+
+```bash
+aptunnel dbs                       # all configured databases
+aptunnel dbs --env=staging         # filter by environment
+```
+
+Output:
+```
+ALIAS      DATABASE             TYPE        PORT    ENVIRONMENT
+─────────────────────────────────────────────────────────────────────
+dev-db     mydb-dev             postgresql  55550   dev
+dev-redis  mydb-dev-redis       redis       55551   dev
+stg-db     mydb-staging         postgresql  55552   staging
+```
+
 ### Status
 
 ```bash
@@ -109,9 +145,9 @@ LOGIN STATUS
 TUNNELS
 
 ENVIRONMENT  DATABASE          ALIAS      PORT   STATUS  UPTIME       PID    CONNECTION URL
-──────────── ─────────────── ─────────── ────── ─────── ──────────── ────── ──────────────────────────────────────────
-dev          ekaredb-dev      dev-db     55554  UP      02h15m30s    12345  postgresql://aptible:xxx@localhost.aptible.in:55554/db
-dev          ekaredb-redis    dev-redis  55555  DOWN    -            -      -
+──────────────────────────────────────────────────────────────────────────────────────────────
+dev          ekaredb-dev       dev-db     55554  UP      02h15m30s    12345  postgresql://aptible:xxx@localhost.aptible.in:55554/db
+dev          ekaredb-redis     dev-redis  55555  DOWN    -            -      -
 ```
 
 ### Login
@@ -119,7 +155,7 @@ dev          ekaredb-redis    dev-redis  55555  DOWN    -            -      -
 ```bash
 aptunnel login                     # uses saved credentials, supports 2FA
 aptunnel login --email=x@y.com --password=secret
-aptunnel login --lifetime=14d      # custom token lifetime
+aptunnel login --lifetime=14d      # custom token lifetime (default: 7d)
 aptunnel login --status            # show token info only
 ```
 
@@ -147,7 +183,7 @@ credentials:
   email: you@company.com
 
 defaults:
-  environment: my-env-development
+  environment: my-env-development   # omitted if you chose "no default" during init
   lifetime: 7d
 
 environments:
@@ -167,6 +203,13 @@ tunnel_defaults:
   start_port: 55550
   port_increment: 1
 ```
+
+### Overridable environment variables
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `APTUNNEL_CONFIG_HOME` | `~/.aptunnel` | Config directory location |
+| `APTUNNEL_TEMP_DIR` | system tmpdir | PID/log file directory |
 
 ---
 
@@ -200,7 +243,7 @@ Completions are dynamic — your actual database aliases appear in tab-completio
 | **Linux** | ✅ Full | `lsof`, `ps`, Unix signals |
 | **macOS** | ✅ Full | Same as Linux |
 | **Windows** | ✅ Full | `netstat`, `tasklist`, `taskkill` |
-| **WSL** | ✅ Full | Treated as Linux, `wslview` for browser |
+| **WSL** | ✅ Full | Treated as Linux |
 
 **Install Aptible CLI:**
 
@@ -221,9 +264,11 @@ curl -s https://toolbelt.aptible.com/install.sh | bash
 
 `aptible db:tunnel` is a blocking foreground process. aptunnel spawns it **detached** with `stdio` redirected to a log file (`/tmp/aptunnel-<alias>.log`), then saves the PID to `/tmp/aptunnel-<alias>.pid`.
 
+The tunnel is considered open once aptible prints `Connect at` in the log (polled every 500ms, timeout 60s).
+
 On `aptunnel status`, each PID file is checked to determine if the process is still alive.
 
-When you close a tunnel (`aptunnel dev-db --close`), aptunnel kills the process and cleans up the PID file.
+When you close a tunnel (`aptunnel dev-db --close`), aptunnel kills the process and cleans up PID/log files.
 
 Pressing **Ctrl+C** while aptunnel is running closes all open tunnels before exiting.
 
@@ -240,6 +285,8 @@ Pressing **Ctrl+C** while aptunnel is running closes all open tunnels before exi
 **"Config file is corrupted"** — Delete `~/.aptunnel/config.yaml` and re-run `aptunnel init`.
 
 **Tunnel fails silently** — Check the log file: `cat /tmp/aptunnel-<alias>.log`.
+
+**`aptunnel init` hangs after email/password** — This can happen if the terminal is not a TTY. Make sure you're running aptunnel directly in a terminal, not piped.
 
 ---
 

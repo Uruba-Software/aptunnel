@@ -5,12 +5,15 @@
 Every time code is committed and pushed to main, determine whether the change
 warrants a version bump. Use these rules:
 
-| Change type | Version bump | Example |
-|---|---|---|
-| Bug fix | patch: `1.0.0 → 1.0.1` | fix a crash, correct output |
-| New feature (backwards-compatible) | minor: `1.0.0 → 1.1.0` | new command, new option |
-| Breaking change | major: `1.0.0 → 2.0.0` | renamed command, removed flag |
-| CI/docs/test only | none | workflow fix, README update |
+| Change type | Version bump | Patch reset? | Example |
+|---|---|---|---|
+| Bug fix | patch: `1.0.0 → 1.0.1` | — | fix a crash, correct output |
+| New feature (backwards-compatible) | minor: `1.0.0 → 1.1.0` | **yes, patch → 0** | new command, new option |
+| Breaking change | major: `1.0.0 → 2.0.0` | yes, minor+patch → 0 | renamed command, removed flag |
+| CI/docs/test only | none | — | workflow fix, README update |
+
+**Semver rule:** when the minor version increases, patch resets to 0 (`1.0.5 → 1.1.0`, not `1.1.5`).
+When the major version increases, both minor and patch reset to 0 (`1.2.3 → 2.0.0`).
 
 ### Steps to follow on every code push
 
@@ -19,17 +22,21 @@ warrants a version bump. Use these rules:
      the version in the same commit as the code change, never after.
 2. **Commit** all changes (code + version bump) in a single commit.
    - Commit author: always `biyro02` (the configured git user) — do NOT add `Co-Authored-By` lines.
+   - Write a clear, user-facing commit message — it becomes the GitHub release notes.
 3. **Push** to `main`.
-4. **If version was bumped**: create and push a matching git tag so CI publishes to npm automatically:
+4. **If version was bumped**: create a GitHub release (not just a tag) so npm CI publishes
+   and release notes are visible on GitHub:
    ```
    git tag v<new-version>
    git push origin v<new-version>
+   gh release create v<new-version> --title "v<new-version>" --notes "<commit message body>"
    ```
-   Example: bumping to `1.0.1`:
-   - Update package.json → `"version": "1.0.1"`
-   - `git add package.json && git commit -m "fix: ... (bumps 1.0.0 → 1.0.1)"`
+   Example: bumping to `1.1.0`:
+   - Update package.json → `"version": "1.1.0"`
+   - `git add . && git commit -m "feat: add dbs command and env selection improvements"`
    - `git push origin main`
-   - `git tag v1.0.1 && git push origin v1.0.1`
+   - `git tag v1.1.0 && git push origin v1.1.0`
+   - `gh release create v1.1.0 --title "v1.1.0" --notes "$(git log -1 --pretty=%B)"`
 
 CI will then run all tests (9 combinations: 3 OS × 3 Node versions) and publish
 to npm automatically if everything passes.
@@ -38,6 +45,7 @@ to npm automatically if everything passes.
 - Never push a tag without first pushing the matching commit to main.
 - Never bump the version for CI-only, doc-only, or test-only changes.
 - Never manually run `npm publish` — let CI handle it via the tag.
+- Never create a GitHub release before the tag is pushed.
 
 ## Accounts & references
 - GitHub org: Uruba-Software (owner: biyro02)
