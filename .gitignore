@@ -4,3 +4,4 @@ node_modules/
 *.pid
 .DS_Store
 Thumbs.db
+.npmrc
