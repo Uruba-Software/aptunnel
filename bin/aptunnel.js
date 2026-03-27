@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
-import { createRequire } from 'module';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import { dirname, resolve } from 'path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -16,7 +15,9 @@ if (major < 18) {
 }
 
 // Launch the CLI router
-import(resolve(__dirname, '../src/index.js')).catch((err) => {
+// Use pathToFileURL so Windows absolute paths (D:\...) are valid ESM specifiers.
+const entryUrl = pathToFileURL(resolve(__dirname, '../src/index.js')).href;
+import(entryUrl).catch((err) => {
   process.stderr.write(`Fatal error: ${err.message}\n`);
   process.exit(1);
 });

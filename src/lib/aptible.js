@@ -3,6 +3,9 @@ import { readFileSync, existsSync, writeFileSync, openSync, closeSync } from 'fs
 import { homedir, tmpdir } from 'os';
 import { join } from 'path';
 
+// On Windows, .cmd wrappers require a shell to be resolved by CreateProcess.
+const SHELL_OPT = process.platform === 'win32' ? { shell: true } : {};
+
 function getTempDir() {
   return process.env.APTUNNEL_TEMP_DIR ?? tmpdir();
 }
@@ -13,7 +16,7 @@ function run(args, opts = {}) {
   // Destructure to avoid `...opts` overwriting the merged env object below
   const { env: envOverrides = {}, ...spawnOpts } = opts;
   const env = { ...process.env, ...envOverrides };
-  return spawnSync('aptible', args, { encoding: 'utf8', env, ...spawnOpts });
+  return spawnSync('aptible', args, { encoding: 'utf8', env, ...SHELL_OPT, ...spawnOpts });
 }
 
 function parseJson(raw) {
@@ -31,7 +34,7 @@ function parseJson(raw) {
  * @returns {boolean}
  */
 export function isInstalled() {
-  const result = spawnSync('aptible', ['version'], { encoding: 'utf8' });
+  const result = spawnSync('aptible', ['version'], { encoding: 'utf8', ...SHELL_OPT });
   return result.status === 0 && !result.error;
 }
 
@@ -61,7 +64,7 @@ export function login({ email, password, lifetime = '7d', otp } = {}) {
     process.stdin.resume();
 
     // stdio: 'inherit' is critical — aptible prompts for 2FA interactively
-    const child = spawn('aptible', args, { stdio: 'inherit' });
+    const child = spawn('aptible', args, { stdio: 'inherit', ...SHELL_OPT });
 
     child.on('close', (code) => resolve(code === 0));
     child.on('error', ()     => resolve(false));
@@ -181,6 +184,7 @@ export function openTunnel({ dbHandle, environment, port }) {
     const child = spawn('aptible', args, {
       detached: true,
       stdio:    ['ignore', logFd, logFd],
+      ...SHELL_OPT,
     });
 
     // Parent no longer needs the fd — the child has its own dup'd copy
@@ -316,7 +320,7 @@ export function getLogs({ appHandle, environment }) {
     const child = spawn(
       'aptible',
       ['logs', '--app', appHandle, '--environment', environment],
-      { stdio: 'inherit' }
+      { stdio: 'inherit', ...SHELL_OPT }
     );
     child.on('close', resolve);
     child.on('error', reject);
