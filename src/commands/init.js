@@ -283,18 +283,41 @@ function ask(prompt) {
 }
 
 function askSecret(prompt) {
+  // Close the shared readline so we can take over stdin directly.
+  // Monkey-patching rl._writeToOutput (private API) is unreliable across
+  // Node.js versions — reading raw characters is the portable alternative.
+  if (_rl) { _rl.close(); _rl = null; }
+
   return new Promise((resolve) => {
-    const rl = getRL();
     process.stdout.write(prompt);
-    rl._writeToOutput = function(str) {
-      if (!this.stdoutMuted) this.output.write(str);
-    };
-    rl.stdoutMuted = true;
-    rl.question('', (answer) => {
-      rl.stdoutMuted = false;
-      rl._writeToOutput = function(str) { this.output.write(str); };
-      process.stdout.write('\n');
-      resolve(answer);
-    });
+
+    const chars = [];
+    process.stdin.resume();
+    process.stdin.setEncoding('utf8');
+
+    const isTTY = !!process.stdin.isTTY;
+    if (isTTY) process.stdin.setRawMode(true);
+
+    function onData(data) {
+      for (const char of data) {
+        if (char === '\r' || char === '\n') {
+          process.stdin.removeListener('data', onData);
+          if (isTTY) process.stdin.setRawMode(false);
+          process.stdout.write('\n');
+          resolve(chars.join(''));
+          return;
+        } else if (char === '\u0003') {
+          // Ctrl+C
+          process.stdout.write('\n');
+          process.exit(0);
+        } else if (char === '\u007f' || char === '\b') {
+          if (chars.length > 0) chars.pop();
+        } else if (char >= ' ') {
+          chars.push(char);
+        }
+      }
+    }
+
+    process.stdin.on('data', onData);
   });
 }
