@@ -54,8 +54,8 @@ describe('process-manager', () => {
 
     it('returns false for a dead process PID', async () => {
       const child = spawn(
-        isWindows ? 'timeout' : 'sleep',
-        isWindows ? ['3600', '/nobreak'] : ['3600'],
+        process.execPath,
+        ['-e', 'setTimeout(() => {}, 60000)'],
         { detached: true, stdio: 'ignore' }
       );
       child.unref();
@@ -117,8 +117,8 @@ describe('process-manager', () => {
 
     it('marks dead PIDs as not running', async () => {
       const child = spawn(
-        isWindows ? 'timeout' : 'sleep',
-        isWindows ? ['3600', '/nobreak'] : ['3600'],
+        process.execPath,
+        ['-e', 'setTimeout(() => {}, 60000)'],
         { detached: true, stdio: 'ignore' }
       );
       child.unref();

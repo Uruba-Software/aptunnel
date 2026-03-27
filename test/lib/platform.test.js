@@ -136,10 +136,11 @@ describe('getProcessUptime', () => {
 
 describe('killProcess', () => {
   it('kills a spawned process', async () => {
-    // Spawn a long-running process
+    // Spawn a long-running process using Node itself — works cross-platform
+    // without needing sleep (Unix) or timeout.exe (Windows, which exits without a console).
     const child = spawn(
-      isWindows ? 'timeout' : 'sleep',
-      isWindows ? ['3600', '/nobreak'] : ['3600'],
+      process.execPath,
+      ['-e', 'setTimeout(() => {}, 60000)'],
       { detached: true, stdio: 'ignore' }
     );
     child.unref();
