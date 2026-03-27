@@ -155,7 +155,7 @@ dev          ekaredb-redis     dev-redis  55555  DOWN    -            -      -
 ```bash
 aptunnel login                     # uses saved credentials, supports 2FA
 aptunnel login --email=x@y.com --password=secret
-aptunnel login --lifetime=14d      # custom token lifetime (default: 7d)
+aptunnel login --lifetime=7d       # custom token lifetime (max: 7d)
 aptunnel login --status            # show token info only
 ```
 
