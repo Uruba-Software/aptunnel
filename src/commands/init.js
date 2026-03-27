@@ -1,8 +1,7 @@
-import readline from 'readline';
 import { createInterface } from 'readline';
 import { logger } from '../lib/logger.js';
 import { isInstalled, login, listEnvironments, listDatabases } from '../lib/aptible.js';
-import { installInstructions, detectOS } from '../lib/platform.js';
+import { installInstructions } from '../lib/platform.js';
 import {
   exists, save, savePassword, getConfigDir, getConfigPath, nextAvailablePort,
 } from '../lib/config-manager.js';
@@ -50,9 +49,9 @@ export async function runInit(args) {
   console.log('');
 
   // 5. Discover environments
-  const envSpinner = (await import('ora')).default({ text: 'Discovering environments…' }).start();
+  process.stdout.write('Discovering environments…\n');
   const environments = listEnvironments();
-  envSpinner.succeed(`Found ${environments.length} environment(s).`);
+  logger.success(`Found ${environments.length} environment(s).`);
 
   if (environments.length === 0) {
     logger.warn('No environments found for this account.');
@@ -109,9 +108,9 @@ export async function runInit(args) {
 
   for (const env of selectedEnvs) {
     console.log('');
-    const dbSpinner = (await import('ora')).default({ text: `Fetching databases for ${env.handle}…` }).start();
+    process.stdout.write(`Fetching databases for ${env.handle}…\n`);
     const databases = listDatabases(env.handle);
-    dbSpinner.succeed(`Found ${databases.length} database(s) in ${env.handle}.`);
+    logger.success(`Found ${databases.length} database(s) in ${env.handle}.`);
 
     if (databases.length === 0) continue;
 
