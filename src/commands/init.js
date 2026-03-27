@@ -68,7 +68,7 @@ export async function runInit(args) {
   console.log('');
 
   const selection = await ask(
-    `Select environments to configure (comma-separated numbers, or "all") [all]: `
+    `Select environments (comma-separated numbers, "all", or press Enter for all): `
   );
 
   let selectedEnvs;

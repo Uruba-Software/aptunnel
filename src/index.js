@@ -83,6 +83,12 @@ try {
       break;
     }
 
+    case 'dbs': {
+      const { runDbs } = await import('./commands/dbs.js');
+      runDbs(rest);
+      break;
+    }
+
     case 'completions': {
       const { runCompletions } = await import('./commands/completions.js');
       await runCompletions(rest);

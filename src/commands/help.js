@@ -36,6 +36,7 @@ export function runHelp() {
   cmd('aptunnel init',                          'Setup wizard (login, discover environments & databases)');
   cmd('aptunnel login [--status]',              'Login to Aptible or show token status');
   cmd('aptunnel status',                        'Show all tunnel statuses and login info');
+  cmd('aptunnel dbs [--env=ALIAS]',             'List all configured databases');
   cmd('aptunnel config',                        'View or modify configuration');
   cmd('aptunnel completions <bash|zsh|fish>',   'Print shell completion script');
   cmd('aptunnel <db-alias> [--port=N]',         'Open a tunnel to a database');
