@@ -87,12 +87,17 @@ export async function runInit(args) {
   }
 
   // 7. Set default environment
-  let defaultEnvHandle = selectedEnvs[0].handle;
-  if (selectedEnvs.length > 1) {
-    console.log('');
-    selectedEnvs.forEach((env, i) => console.log(`  [${i + 1}] ${env.handle}`));
-    const defChoice = await ask(`Default environment [1]: `);
-    const defIdx = parseInt(defChoice.trim() || '1', 10) - 1;
+  console.log('');
+  console.log('Set a default environment (used when no --env flag is given):');
+  selectedEnvs.forEach((env, i) => console.log(`  [${i + 1}] ${env.handle}`));
+  console.log('  [0] None (no default)');
+  const defChoice = await ask(`Default environment (0 to skip) [1]: `);
+  const defTrimmed = defChoice.trim();
+  let defaultEnvHandle = null;
+  if (defTrimmed === '0') {
+    defaultEnvHandle = null;
+  } else {
+    const defIdx = parseInt(defTrimmed || '1', 10) - 1;
     if (defIdx >= 0 && defIdx < selectedEnvs.length) {
       defaultEnvHandle = selectedEnvs[defIdx].handle;
     }
@@ -166,8 +171,8 @@ export async function runInit(args) {
     version: 1,
     credentials: { email },
     defaults: {
-      environment: defaultEnvHandle,
-      lifetime:    '7d',
+      ...(defaultEnvHandle ? { environment: defaultEnvHandle } : {}),
+      lifetime: '7d',
     },
     environments: configEnvironments,
     tunnel_defaults: {
