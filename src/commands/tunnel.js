@@ -205,10 +205,17 @@ async function closeTunnel(id, port) {
   }
 
   killProcess(pid);
-  await sleep(300);
 
-  // Verify port is freed
-  const portState = isPortInUse(port);
+  // Poll until the port is released (up to ~2 s in 250 ms steps).
+  // A flat 300 ms sleep is often too short: the OS keeps the port in
+  // TIME_WAIT / CLOSE_WAIT, causing a false "port in use by another process"
+  // error on the very next open attempt.
+  let portState = isPortInUse(port);
+  for (let i = 0; i < 8 && portState.inUse; i++) {
+    await sleep(250);
+    portState = isPortInUse(port);
+  }
+
   cleanup(id);
 
   if (portState.inUse && portState.pid !== pid) {

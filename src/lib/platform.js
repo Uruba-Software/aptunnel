@@ -108,10 +108,14 @@ export function killProcess(pid) {
     return;
   }
 
+  // Kill the entire process group (negative PID = PGID).
+  // aptible is spawned with detached:true so it becomes a group leader.
+  // This ensures any SSH sub-processes it spawned also die and release the port.
   try {
-    process.kill(pid, 'SIGTERM');
+    process.kill(-pid, 'SIGKILL');
   } catch {
-    // Process may already be gone — ignore
+    // If process-group kill fails (e.g. process already gone), try direct kill.
+    try { process.kill(pid, 'SIGKILL'); } catch { /* already gone */ }
   }
 }
 

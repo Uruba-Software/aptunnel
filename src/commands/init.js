@@ -114,12 +114,13 @@ export async function runInit(args) {
 
     if (databases.length === 0) continue;
 
-    // Auto-assign ports
-    const assignedDbs = databases.map((db) => ({
-      ...db,
-      assignedPort: portCounter++,
-      suggestedAlias: suggestDbAlias(db.handle, databases),
-    }));
+    // Auto-assign ports and deduplicated aliases
+    const assignedDbs = [];
+    for (const db of databases) {
+      const rawAlias = suggestDbAlias(db.handle, databases);
+      const alias    = deduplicateAlias(rawAlias, assignedDbs);
+      assignedDbs.push({ ...db, assignedPort: portCounter++, suggestedAlias: alias });
+    }
 
     // Show proposed config
     console.log('');
