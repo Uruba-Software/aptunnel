@@ -47,6 +47,8 @@ export async function runUninstall(args) {
   console.log('');
 
   // 3. Uninstall the npm package.
+  // APTUNNEL_SKIP_NPM_UNINSTALL=1 skips this step in tests.
+  if (process.env.APTUNNEL_SKIP_NPM_UNINSTALL) return;
   logger.info('Running npm uninstall -g aptunnel…');
   console.log('');
 

@@ -12,10 +12,10 @@
   },
   "scripts": {
     "start": "node bin/aptunnel.js",
-    "test": "node --test test/lib/platform.test.js test/lib/config-manager.test.js test/lib/process-manager.test.js test/lib/aptible.test.js test/lib/completions.test.js test/commands/config.test.js test/commands/help.test.js test/commands/status.test.js test/commands/dbs.test.js",
+    "test": "node --test test/lib/platform.test.js test/lib/config-manager.test.js test/lib/process-manager.test.js test/lib/aptible.test.js test/lib/completions.test.js test/commands/config.test.js test/commands/help.test.js test/commands/status.test.js test/commands/dbs.test.js test/commands/tunnel.test.js test/commands/uninstall.test.js",
     "test:integration": "node --test test/integration/cli.test.js",
-    "test:all": "node --test test/lib/platform.test.js test/lib/config-manager.test.js test/lib/process-manager.test.js test/lib/aptible.test.js test/lib/completions.test.js test/commands/config.test.js test/commands/help.test.js test/commands/status.test.js test/commands/dbs.test.js test/integration/cli.test.js",
-    "test:watch": "node --test --watch test/lib/platform.test.js test/lib/config-manager.test.js test/lib/process-manager.test.js test/lib/aptible.test.js test/lib/completions.test.js test/commands/config.test.js test/commands/help.test.js test/commands/status.test.js test/commands/dbs.test.js"
+    "test:all": "node --test test/lib/platform.test.js test/lib/config-manager.test.js test/lib/process-manager.test.js test/lib/aptible.test.js test/lib/completions.test.js test/commands/config.test.js test/commands/help.test.js test/commands/status.test.js test/commands/dbs.test.js test/commands/tunnel.test.js test/commands/uninstall.test.js test/integration/cli.test.js",
+    "test:watch": "node --test --watch test/lib/platform.test.js test/lib/config-manager.test.js test/lib/process-manager.test.js test/lib/aptible.test.js test/lib/completions.test.js test/commands/config.test.js test/commands/help.test.js test/commands/status.test.js test/commands/dbs.test.js test/commands/tunnel.test.js test/commands/uninstall.test.js"
   },
   "repository": {
     "type": "git",
