@@ -228,7 +228,17 @@ export function openTunnel({ dbHandle, environment, port }) {
         return;
       }
 
-      // Process died unexpectedly.
+      // Success: aptible printed the connection URL.
+      // Check this BEFORE the liveness check so a fast-exiting process (or test mock)
+      // that printed "Connect at" before dying is still treated as success.
+      if (lower.includes('connect at') || lower.includes('connected.')) {
+        clearInterval(poll);
+        const conn = parseConnectionInfo(logContent, port);
+        resolve({ pid: child.pid, port, ...conn });
+        return;
+      }
+
+      // Process died unexpectedly (without printing a success line).
       // EPERM = process exists but we can't signal it (Windows cross-process-group) → treat as alive.
       // ESRCH = no such process → actually dead.
       try { process.kill(child.pid, 0); } catch (e) {
@@ -237,14 +247,6 @@ export function openTunnel({ dbHandle, environment, port }) {
           reject(new Error(`Tunnel process died. Log:\n${logContent.slice(-500)}`));
           return;
         }
-      }
-
-      // Success: aptible printed the connection URL
-      if (lower.includes('connect at') || lower.includes('connected.')) {
-        clearInterval(poll);
-        const conn = parseConnectionInfo(logContent, port);
-        resolve({ pid: child.pid, port, ...conn });
-        return;
       }
 
       // Timed out
