@@ -23,7 +23,7 @@ if "%1"=="db:tunnel" (
     echo * Password: mockpassword123
     echo * Database: db
     echo Connected. Ctrl-C to close connection.
-    timeout /t 3600 /nobreak >nul
+    node -e "setTimeout(function(){},3600000)"
     exit /b 0
 )
 if "%1"=="login" (

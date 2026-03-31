@@ -5,8 +5,10 @@ import { spawn } from 'node:child_process';
 import {
   createTestEnv, writeSampleConfig, injectMockAptible, restorePath,
 } from '../helpers.js';
-import { savePid, cleanup as cleanupPid } from '../../src/lib/process-manager.js';
 import { isPortInUse } from '../../src/lib/platform.js';
+
+// Inject mock aptible for the whole file so isInstalled() passes on CI.
+injectMockAptible();
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 
@@ -43,7 +45,6 @@ describe('tunnel --force open (port conflict)', () => {
   const PORT = 55561; // use a port outside SAMPLE_CONFIG range to avoid collision
 
   before(async () => {
-    injectMockAptible();
     env = createTestEnv();
     await writeSampleConfig();
     // Point dev-db to PORT so we can force a conflict
@@ -53,7 +54,6 @@ describe('tunnel --force open (port conflict)', () => {
   });
 
   after(async () => {
-    restorePath();
     if (server) await new Promise(r => server.close(r));
     env?.cleanup();
   });
