@@ -95,6 +95,12 @@ try {
       break;
     }
 
+    case 'uninstall': {
+      const { runUninstall } = await import('./commands/uninstall.js');
+      await runUninstall(rest);
+      break;
+    }
+
     default: {
       // Any other command is treated as a db alias (or "all")
       const { runTunnel } = await import('./commands/tunnel.js');

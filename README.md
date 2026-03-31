@@ -25,6 +25,7 @@ aptunnel dev-db          # open tunnel to dev database
 aptunnel all             # open all configured tunnels
 aptunnel dbs             # list all configured databases
 aptunnel status          # see what's running
+aptunnel uninstall       # clean uninstall (stops tunnels, removes config, runs npm uninstall)
 ```
 
 ---
@@ -87,6 +88,7 @@ Default environment (0 to skip) [1]:
 aptunnel dev-db                    # open by alias
 aptunnel dev-db --port=5432        # override port for this session
 aptunnel dev-db --env=staging      # target a different environment
+aptunnel dev-db --force            # auto-select a free port if configured port is busy
 ```
 
 Output:
@@ -106,6 +108,7 @@ Output:
 aptunnel dev-db --close
 aptunnel all --close               # close all
 aptunnel all --close --env=staging # close all in staging
+aptunnel dev-db --close --force    # force-release port even if no PID file
 ```
 
 ### Open all tunnels for an environment
@@ -169,6 +172,21 @@ aptunnel config --set-default staging
 aptunnel config --refresh          # re-discover environments/databases
 aptunnel config --path             # print config file path
 ```
+
+### Uninstall
+
+```bash
+aptunnel uninstall                 # stop tunnels, remove config files, run npm uninstall
+aptunnel uninstall --force         # also removes the entire ~/.aptunnel directory
+```
+
+`aptunnel uninstall` does the following in order:
+
+1. Stops all running tunnels
+2. Removes `~/.aptunnel/config.yaml` and `~/.aptunnel/.credentials`
+3. Runs `npm uninstall -g aptunnel`
+
+With `--force`, step 2 removes the entire `~/.aptunnel/` directory instead of individual files.
 
 ---
 
@@ -262,15 +280,17 @@ curl -s https://toolbelt.aptible.com/install.sh | bash
 
 ## How Tunnels Work
 
-`aptible db:tunnel` is a blocking foreground process. aptunnel spawns it **detached** with `stdio` redirected to a log file (`/tmp/aptunnel-<alias>.log`), then saves the PID to `/tmp/aptunnel-<alias>.pid`.
+`aptible db:tunnel` is a blocking foreground process. aptunnel spawns it as a background process with `stdio` redirected to a log file (`/tmp/aptunnel-<alias>.log`), then saves the PID to `/tmp/aptunnel-<alias>.pid`.
 
-The tunnel is considered open once aptible prints `Connect at` in the log (polled every 500ms, timeout 60s).
+The tunnel is considered open once aptible prints `Connect at` in the log (polled every 500 ms, 60 s timeout).
 
 On `aptunnel status`, each PID file is checked to determine if the process is still alive.
 
 When you close a tunnel (`aptunnel dev-db --close`), aptunnel kills the process and cleans up PID/log files.
 
 Pressing **Ctrl+C** while aptunnel is running closes all open tunnels before exiting.
+
+**Windows note:** On Windows the tunnel process is not fully detached from the terminal session. If you close the terminal window while tunnels are running, they will be terminated. Re-open them with `aptunnel <alias>` or `aptunnel all`.
 
 ---
 
@@ -280,7 +300,7 @@ Pressing **Ctrl+C** while aptunnel is running closes all open tunnels before exi
 
 **"Token expired"** — Run `aptunnel login`. aptunnel will attempt auto-relogin on tunnel failures, but a fresh login is the cleanest fix.
 
-**"Port already in use"** — Another process is on that port. Use `--port=<N>` to use a different port or update it with `aptunnel config --set-port dev-db <N>`.
+**"Port already in use"** — Another process is on that port. Use `--force` to let aptunnel auto-select the next free port, `--port=<N>` to pick one manually, or update the default with `aptunnel config --set-port dev-db <N>`.
 
 **"Config file is corrupted"** — Delete `~/.aptunnel/config.yaml` and re-run `aptunnel init`.
 

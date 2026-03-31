@@ -43,6 +43,7 @@ export function runHelp() {
   cmd('aptunnel <db-alias> --close',            'Close a tunnel');
   cmd('aptunnel all [--env=ALIAS]',             'Open all tunnels for an environment');
   cmd('aptunnel all --close [--env=ALIAS]',     'Close all tunnels');
+  cmd('aptunnel uninstall [--force]',           'Stop tunnels, remove config, and uninstall');
   console.log('');
 
   if (hasConfig && databases.length > 0) {
@@ -79,7 +80,9 @@ export function runHelp() {
   opt('--port=N',      'Override port for this session');
   opt('--env=ALIAS',   'Target a specific environment');
   opt('--close',       'Close tunnel(s)');
-  opt('--force',       'Kill existing process on port conflict');
+  opt('--force',       'Open: auto-select a free port if configured port is busy');
+  opt('',              'Close: force-release port even if no PID file exists');
+  opt('',              'Uninstall: also wipe the entire ~/.aptunnel directory');
   opt('--help, -h',    'Show this help');
   opt('--version, -v', 'Show version');
   console.log('');

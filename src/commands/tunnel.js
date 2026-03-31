@@ -49,7 +49,7 @@ async function handleOne({ alias, doClose, doForce, portOverride, envOverride })
   const id   = toIdentifier(db.alias);
 
   if (doClose) {
-    await closeTunnel(id, port);
+    await closeTunnel(id, port, doForce);
     return;
   }
 
@@ -78,7 +78,7 @@ async function handleAll({ doClose, envArg, doForce }) {
   if (doClose) {
     for (const db of targets) {
       const id = toIdentifier(db.alias);
-      await closeTunnel(id, db.port);
+      await closeTunnel(id, db.port, doForce);
     }
     return;
   }
@@ -133,11 +133,15 @@ async function openOneTunnel({ db, environment, port, id, doForce, skipRelogin =
   const portState = isPortInUse(port);
   if (portState.inUse) {
     if (doForce) {
-      logger.warn(`Killing process ${portState.pid} occupying port ${port}…`);
-      killProcess(portState.pid);
-      await sleep(500);
+      const free = findFreePort(port + 1);
+      if (free === null) {
+        logger.warn(`Port ${port} is in use and no free port was found nearby. Use --port=<N> to specify one.`);
+        return { success: false };
+      }
+      logger.info(`Port ${port} is in use — switching to port ${free}.`);
+      port = free;
     } else {
-      logger.warn(`Port ${port} is already in use (PID ${portState.pid}). Use --force to kill it or --port=<N> to use a different port.`);
+      logger.warn(`Port ${port} is already in use (PID ${portState.pid}). Use --force to auto-select a free port, or --port=<N>.`);
       return { success: false };
     }
   }
@@ -196,20 +200,31 @@ async function openOneTunnel({ db, environment, port, id, doForce, skipRelogin =
 
 // ─── Close logic ──────────────────────────────────────────────────────────────
 
-async function closeTunnel(id, port) {
+async function closeTunnel(id, port, doForce = false) {
   const pid = readPid(id);
 
   if (!pid) {
-    logger.warn(`No tunnel found for ${id}.`);
+    if (doForce) {
+      // No PID file — check if anything is bound to the port and kill it.
+      const portState = isPortInUse(port);
+      if (portState.inUse && portState.pid) {
+        logger.warn(`No PID file for ${id}, but port ${port} is held by PID ${portState.pid} — force-killing.`);
+        killProcess(portState.pid);
+        await sleep(300);
+        cleanup(id);
+        logger.success(`Port ${port} released.`);
+      } else {
+        logger.info(`${id}: nothing to close.`);
+      }
+    } else {
+      logger.warn(`No tunnel found for ${id}.`);
+    }
     return;
   }
 
   killProcess(pid);
 
   // Poll until the port is released (up to ~2 s in 250 ms steps).
-  // A flat 300 ms sleep is often too short: the OS keeps the port in
-  // TIME_WAIT / CLOSE_WAIT, causing a false "port in use by another process"
-  // error on the very next open attempt.
   let portState = isPortInUse(port);
   for (let i = 0; i < 8 && portState.inUse; i++) {
     await sleep(250);
@@ -218,8 +233,15 @@ async function closeTunnel(id, port) {
 
   cleanup(id);
 
-  if (portState.inUse && portState.pid !== pid) {
-    logger.warn(`Port ${port} still in use by PID ${portState.pid} (not aptunnel).`);
+  if (portState.inUse) {
+    if (doForce && portState.pid) {
+      // Port still occupied — force-kill whatever is holding it.
+      killProcess(portState.pid);
+      await sleep(250);
+      logger.success(`${id} tunnel closed (port ${port} force-released).`);
+    } else {
+      logger.warn(`Port ${port} still in use by PID ${portState.pid} (not aptunnel).`);
+    }
   } else {
     logger.success(`${id} tunnel closed.`);
   }
@@ -240,6 +262,13 @@ function printConnectionInfo(alias, port, conn) {
 }
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
+
+function findFreePort(startPort, maxTries = 20) {
+  for (let p = startPort; p < startPort + maxTries; p++) {
+    if (!isPortInUse(p).inUse) return p;
+  }
+  return null;
+}
 
 function parseFlag(args, flag) {
   const entry = args.find(a => a.startsWith(`${flag}=`));

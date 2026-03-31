@@ -4,6 +4,20 @@ All notable changes to aptunnel are documented here.
 
 ---
 
+## [1.2.0] — 2026-03-31
+
+### Added
+- **`aptunnel uninstall [--force]`** — clean uninstall command: stops running tunnels,
+  removes config/credential files, then runs `npm uninstall -g aptunnel`. With `--force`,
+  the entire `~/.aptunnel/` directory is removed.
+- **`--force` on open** — if the configured port is in use, automatically selects the next
+  free port instead of erroring. (Previous behaviour was to kill the process on that port;
+  that has been replaced by the safer auto-select strategy.)
+- **`--force` on close** — if no PID file exists but the port is still occupied, force-kills
+  whatever is holding that port and reports success.
+
+---
+
 ## [1.1.3] — 2026-03-31
 
 ### Fixed (Windows)
