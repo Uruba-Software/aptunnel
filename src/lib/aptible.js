@@ -180,8 +180,9 @@ export function openTunnel({ dbHandle, environment, port }) {
 
     const args = ['db:tunnel', dbHandle, '--environment', environment, '--port', String(port)];
     const child = spawn('aptible', args, {
-      detached: true,
-      stdio:    ['ignore', logFd, logFd],
+      detached:    true,
+      stdio:       ['ignore', logFd, logFd],
+      windowsHide: true,   // prevent new console window on Windows; keeps stdio on logFd
       ...SHELL_OPT,
     });
 
@@ -216,11 +217,15 @@ export function openTunnel({ dbHandle, environment, port }) {
         return;
       }
 
-      // Process died unexpectedly
-      try { process.kill(child.pid, 0); } catch {
-        clearInterval(poll);
-        reject(new Error(`Tunnel process died. Log:\n${logContent.slice(-500)}`));
-        return;
+      // Process died unexpectedly.
+      // EPERM = process exists but we can't signal it (Windows cross-process-group) → treat as alive.
+      // ESRCH = no such process → actually dead.
+      try { process.kill(child.pid, 0); } catch (e) {
+        if (e.code !== 'EPERM') {
+          clearInterval(poll);
+          reject(new Error(`Tunnel process died. Log:\n${logContent.slice(-500)}`));
+          return;
+        }
       }
 
       // Success: aptible printed the connection URL

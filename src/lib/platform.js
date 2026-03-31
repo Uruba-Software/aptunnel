@@ -102,7 +102,9 @@ export function killProcess(pid) {
   const os = detectOS();
 
   if (os === 'windows') {
-    spawnSync('taskkill', ['/PID', String(pid), '/F'], { encoding: 'utf8' });
+    // /T kills the entire process tree (cmd.exe + child aptible process).
+    // Without /T, the aptible subprocess stays alive and holds the log file open.
+    spawnSync('taskkill', ['/F', '/T', '/PID', String(pid)], { encoding: 'utf8' });
     return;
   }
 

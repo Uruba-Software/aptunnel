@@ -20,7 +20,9 @@ When the major version increases, both minor and patch reset to 0 (`1.2.3 → 2.
 1. **Update `package.json` version** FIRST if the change warrants a bump (see table above).
    - CRITICAL: The version in `package.json` MUST match the git tag. Always bump
      the version in the same commit as the code change, never after.
-2. **Commit** all changes (code + version bump) in a single commit.
+2. **Update `CHANGELOG.md`** — add a new `## [x.y.z] — YYYY-MM-DD` section at the top with
+   a concise bullet list of what changed. This is **mandatory** for every versioned release.
+3. **Commit** all changes (code + version bump + CHANGELOG) in a single commit.
    - Commit author: always `biyro02` (the configured git user) — do NOT add `Co-Authored-By` lines.
    - Write a clear, user-facing commit message — it becomes the GitHub release notes.
 3. **Push** to `main`.
