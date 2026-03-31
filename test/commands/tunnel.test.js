@@ -54,6 +54,15 @@ describe('tunnel --force open (port conflict)', () => {
   });
 
   after(async () => {
+    // Kill any tunnel process opened during the test so the log file is released
+    // before we try to remove the temp directory (required on Windows).
+    const { readPid, cleanup: cleanupTunnel } = await import('../../src/lib/process-manager.js');
+    const { killProcess } = await import('../../src/lib/platform.js');
+    const { toIdentifier } = await import('../../src/lib/process-manager.js');
+    const pid = readPid(toIdentifier('dev-db'));
+    if (pid) { try { killProcess(pid); } catch { /* already gone */ } }
+    cleanupTunnel(toIdentifier('dev-db'));
+    await new Promise(r => setTimeout(r, 200)); // let OS release file handles
     if (server) await new Promise(r => server.close(r));
     env?.cleanup();
   });
