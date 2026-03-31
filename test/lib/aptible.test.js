@@ -15,6 +15,8 @@ import {
   listDatabases,
   listApps,
 } from '../../src/lib/aptible.js';
+import { getProcessInfo } from '../../src/lib/platform.js';
+import { logFilePath } from '../../src/lib/process-manager.js';
 
 describe('aptible (mocked)', () => {
   before(() => injectMockAptible());
@@ -163,6 +165,27 @@ describe('aptible (mocked)', () => {
       assert.equal(tunnelResult.credentials.user,     'aptible');
       assert.equal(tunnelResult.credentials.password, 'mockpassword123');
       assert.equal(tunnelResult.credentials.host,     'localhost.aptible.in');
+    });
+
+    it('spawned process is alive after resolution', () => {
+      // Verifies PID tracking works — critical on Windows where detached:true
+      // causes AllocConsole() to override stdio, preventing savePid from being called.
+      assert.equal(
+        getProcessInfo(tunnelResult.pid).running, true,
+        `Expected tunnel process PID ${tunnelResult.pid} to be alive after openTunnel resolved`
+      );
+    });
+
+    it('log file was written to (stdout captured, not lost to console)', () => {
+      // Verifies that aptible's stdout reached our log file.
+      // On Windows with detached:true, AllocConsole() intercepts stdout so the
+      // log file stays empty — this test would catch that regression.
+      const logFile = logFilePath('mydb-dev');
+      const content = fs.readFileSync(logFile, 'utf8');
+      assert.ok(
+        content.toLowerCase().includes('connect at'),
+        `Expected log file to contain "Connect at". Contents:\n${content.slice(0, 300)}`
+      );
     });
   });
 });

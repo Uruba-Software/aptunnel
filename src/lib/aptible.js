@@ -180,9 +180,20 @@ export function openTunnel({ dbHandle, environment, port }) {
 
     const args = ['db:tunnel', dbHandle, '--environment', environment, '--port', String(port)];
     const child = spawn('aptible', args, {
-      detached:    true,
+      // Windows: do NOT use detached:true. With DETACHED_PROCESS set, cmd.exe has
+      // no console and calls AllocConsole() — which resets the process's standard
+      // handles, overriding our STARTF_USESTDHANDLES file descriptors. aptible then
+      // writes to the new hidden console instead of our log file, the poll never
+      // sees "Connect at", and times out after 60 s.
+      // Without detached, cmd.exe inherits the parent console and respects our
+      // explicit file handles. child.unref() is sufficient on Windows: child
+      // processes are not killed when the parent exits (unlike Unix).
+      //
+      // Linux/macOS: detached:true puts the process in its own process group so it
+      // is not reached by SIGHUP when the user closes their terminal.
+      detached:    process.platform !== 'win32',
       stdio:       ['ignore', logFd, logFd],
-      windowsHide: true,   // prevent new console window on Windows; keeps stdio on logFd
+      windowsHide: true,
       ...SHELL_OPT,
     });
 
