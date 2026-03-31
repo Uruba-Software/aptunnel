@@ -1,7 +1,8 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, chmodSync } from 'fs';
-import { homedir, platform } from 'os';
+import { homedir, platform, hostname, userInfo } from 'os';
 import { join, dirname } from 'path';
 import { spawnSync } from 'child_process';
+import { createCipheriv, createDecipheriv, randomBytes, pbkdf2Sync } from 'node:crypto';
 import yaml from 'js-yaml';
 
 // Allow tests to redirect config to a temp directory via APTUNNEL_CONFIG_HOME
@@ -55,14 +56,48 @@ export function save(config) {
 
 // ─── Credentials ─────────────────────────────────────────────────────────────
 
+// ─── Credential encryption (AES-256-GCM) ─────────────────────────────────────
+// Key is derived from hostname + username so it's unique per machine/user.
+// This protects against accidental exposure (backup leaks, etc.) without
+// requiring a native keychain addon. The file is also mode 600.
+
+function deriveKey() {
+  let machine;
+  try {
+    machine = `${hostname()}:${userInfo().username}`;
+  } catch {
+    machine = process.env.USERNAME ?? process.env.USER ?? 'aptunnel';
+  }
+  return pbkdf2Sync(machine, 'aptunnel-creds-v1', 100_000, 32, 'sha256');
+}
+
 /**
- * Read password from ~/.aptunnel/.credentials
+ * Read password from ~/.aptunnel/.credentials (encrypted or legacy plaintext).
  * @returns {string | null}
  */
 export function readPassword() {
   if (!existsSync(getCredsPath())) return null;
   try {
     const content = readFileSync(getCredsPath(), 'utf8');
+
+    // Encrypted format: APTUNNEL_PASSWORD_ENC=<iv_hex>:<tag_hex>:<cipher_hex>
+    const encMatch = content.match(/^APTUNNEL_PASSWORD_ENC=([0-9a-f]+):([0-9a-f]+):([0-9a-f]+)$/m);
+    if (encMatch) {
+      try {
+        const key        = deriveKey();
+        const iv         = Buffer.from(encMatch[1], 'hex');
+        const authTag    = Buffer.from(encMatch[2], 'hex');
+        const ciphertext = Buffer.from(encMatch[3], 'hex');
+        const decipher   = createDecipheriv('aes-256-gcm', key, iv);
+        decipher.setAuthTag(authTag);
+        return decipher.update(ciphertext).toString('utf8') + decipher.final('utf8');
+      } catch {
+        process.stderr.write('[aptunnel] Warning: credentials could not be decrypted on this machine. Run `aptunnel login` to re-authenticate.\n');
+        return null;
+      }
+    }
+
+    // Legacy plaintext fallback (backwards compatibility)
     const match = content.match(/^APTUNNEL_PASSWORD=(.+)$/m);
     return match?.[1]?.trim() ?? null;
   } catch {
@@ -71,13 +106,21 @@ export function readPassword() {
 }
 
 /**
- * Save password to ~/.aptunnel/.credentials with restricted permissions.
+ * Save password to ~/.aptunnel/.credentials (AES-256-GCM encrypted, mode 600).
  * @param {string} password
  */
 export function savePassword(password) {
   ensureConfigDir();
   const credsPath = getCredsPath();
-  writeFileSync(credsPath, `APTUNNEL_PASSWORD=${password}\n`, { mode: 0o600 });
+
+  const key       = deriveKey();
+  const iv        = randomBytes(12);
+  const cipher    = createCipheriv('aes-256-gcm', key, iv);
+  const encrypted = Buffer.concat([cipher.update(password, 'utf8'), cipher.final()]);
+  const tag       = cipher.getAuthTag();
+
+  const content = `APTUNNEL_PASSWORD_ENC=${iv.toString('hex')}:${tag.toString('hex')}:${encrypted.toString('hex')}\n`;
+  writeFileSync(credsPath, content, { mode: 0o600 });
 
   if (platform() === 'win32') {
     // On Windows chmod doesn't restrict access — use icacls
@@ -236,6 +279,17 @@ export function nextAvailablePort() {
   let port = start;
   while (usedPorts.has(port)) port++;
   return port;
+}
+
+/**
+ * Return the install type recorded in config ('express' | 'custom' | null).
+ */
+export function getInstallType() {
+  try {
+    return load().install_type ?? null;
+  } catch {
+    return null;
+  }
 }
 
 // ─── Internal ─────────────────────────────────────────────────────────────────

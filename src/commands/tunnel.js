@@ -255,7 +255,7 @@ function printConnectionInfo(alias, port, conn) {
   logger.detail('Port:',     String(conn.port ?? port));
   logger.detail('Host:',     conn.host ?? 'localhost.aptible.in');
   logger.detail('User:',     conn.user ?? 'aptible');
-  logger.detail('Password:', conn.password ? chalk.dim('*'.repeat(Math.min(conn.password.length, 12))) : chalk.dim('(not parsed)'));
+  logger.detail('Password:', conn.password || chalk.dim('(not parsed)'));
   logger.detail('URL:',      conn.url ? chalk.cyan(conn.url) : chalk.dim('(not parsed)'));
   logger.detail('PID:',      String(readPid(toIdentifier(alias)) ?? '?'));
   console.log('');

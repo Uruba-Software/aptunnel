@@ -51,17 +51,38 @@ npm install -g aptunnel
 aptunnel init
 ```
 
-The setup wizard will:
+The setup wizard first asks for an installation type:
 
-1. Verify the Aptible CLI is installed
-2. Log you in — supports **2FA** (OTP prompt appears directly in your terminal)
-3. Discover all your environments and databases
-4. Auto-assign local ports starting at `55550`
-5. Let you customize short aliases (e.g. `dev-db`, `dev-redis`) and ports
-6. Ask which environment to use as the **default** (or skip with `0` for no default)
-7. Write `~/.aptunnel/config.yaml`
+```
+Installation type:
+  [1] Express  — login + auto-configure everything with defaults
+  [2] Custom   — full interactive setup (ports, aliases, environments)
 
-**Environment selection during init:**
+Select [1]:
+```
+
+### Express install (recommended)
+
+Enter your Aptible email + password (2FA prompt appears if enabled). aptunnel then:
+
+1. Logs you in
+2. Discovers all your environments and databases automatically
+3. Assigns local ports starting at `55550`
+4. Uses each database's actual Aptible handle as its alias
+5. Writes `~/.aptunnel/config.yaml`
+
+No further prompts. Run `aptunnel config --set-port` or `aptunnel config --set-default` afterwards to customise.
+
+### Custom install
+
+Same login step, then full interactive setup:
+
+1. Select which environments to include
+2. Optionally customise port numbers and aliases for each database
+3. Choose a default environment
+4. Writes `~/.aptunnel/config.yaml`
+
+**Example Custom session:**
 
 ```
 Available environments:
@@ -69,14 +90,18 @@ Available environments:
   [2] my-company-staging-def456
   [3] my-company-development-ghi789
 
-Select environments (comma-separated numbers, "all", or press Enter for all): 1,3
+Select environments (comma-separated numbers or "all") [all]: 1,3
 
-Set a default environment (used when no --env flag is given):
-  [1] my-company-production-abc123
-  [2] my-company-development-ghi789
-  [0] None (no default)
-Default environment (0 to skip) [1]:
+  Databases in my-company-production-abc123:
+  [1] mydb-prod  →  alias: mydb-prod  port: 55550  (postgresql)
+
+  Customize aliases? (y/N) [N]: y
+    Alias for mydb-prod [mydb-prod]: prod-db
+
+Set a default environment (0 to skip) [1]: 1
 ```
+
+The chosen install type is saved in `config.yaml` and used as the default on future `aptunnel init` runs.
 
 ---
 
@@ -192,7 +217,7 @@ With `--force`, step 2 removes the entire `~/.aptunnel/` directory instead of in
 
 ## Configuration
 
-Config lives at `~/.aptunnel/config.yaml`. Password is stored separately in `~/.aptunnel/.credentials` (mode 600).
+Config lives at `~/.aptunnel/config.yaml`. Your Aptible account password is stored separately in `~/.aptunnel/.credentials` — AES-256-GCM encrypted with a key derived from your machine hostname and username (PBKDF2), and with file permissions restricted to your user (mode 600 on Unix, `icacls` on Windows). Existing plaintext credential files from earlier versions are read transparently and re-encrypted on next login.
 
 ```yaml
 version: 1

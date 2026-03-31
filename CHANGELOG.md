@@ -4,6 +4,39 @@ All notable changes to aptunnel are documented here.
 
 ---
 
+## [1.3.0] — 2026-04-01
+
+### Added
+- **Express / Custom install** — `aptunnel init` now asks for installation type at the start.
+  - **Express**: enter email + password (with 2FA), everything else (environments, databases,
+    aliases, ports) is auto-configured with defaults. No prompts.
+  - **Custom**: full interactive setup — select environments, customize aliases and ports,
+    set default environment (previous behaviour).
+  - The chosen type is saved in `config.yaml` as `install_type` and used as the default
+    on future `aptunnel init` runs.
+
+### Changed
+- **Alias defaults = actual handle** — database and environment aliases now default to the
+  real Aptible handle (e.g. `mydb-dev-abc123`) instead of a shortened guess. Users can still
+  change them during Custom install. Eliminates alias collision bugs.
+- **DB connection password shown in full** — the password printed after opening a tunnel is no
+  longer masked. Aptible already shows it; aptunnel should too so you can copy it into your
+  DB client.
+- **Encrypted credentials file** — `~/.aptunnel/.credentials` is now written with AES-256-GCM
+  encryption (key derived from machine hostname + username via PBKDF2). Existing plaintext
+  `.credentials` files are read transparently; the file is re-encrypted on the next
+  `aptunnel init` or `aptunnel login`.
+- **`aptunnel init` no longer hangs on N** — answering N to any prompt now cleanly skips that
+  section and continues; readline is properly closed before exiting.
+
+### Fixed
+- **Windows: `aptunnel status` showing tunnels as DOWN** — on Windows with `shell: true`,
+  `child.pid` is the `cmd.exe` wrapper PID which can exit while the real aptible process keeps
+  running. Status now queries the port owner PID (`netstat -ano`) after the tunnel resolves and
+  saves that instead.
+
+---
+
 ## [1.2.0] — 2026-03-31
 
 ### Added

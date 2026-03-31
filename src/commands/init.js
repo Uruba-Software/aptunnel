@@ -3,7 +3,7 @@ import { logger } from '../lib/logger.js';
 import { isInstalled, login, listEnvironments, listDatabases } from '../lib/aptible.js';
 import { installInstructions } from '../lib/platform.js';
 import {
-  exists, save, savePassword, getConfigDir, getConfigPath, nextAvailablePort,
+  exists, save, savePassword, getConfigDir, getConfigPath, nextAvailablePort, getInstallType,
 } from '../lib/config-manager.js';
 
 // ─── Entry point ──────────────────────────────────────────────────────────────
@@ -24,20 +24,31 @@ export async function runInit(args) {
   if (exists()) {
     const reinit = await ask('Config already exists. Reinitialize? (y/N) [N]: ');
     if (!reinit.match(/^y(es)?$/i)) {
+      closeRL();
       logger.info('Aborted.');
       return;
     }
     console.log('');
   }
 
-  // 3. Collect credentials
+  // 3. Installation type
+  const priorType    = getInstallType();
+  const defaultType  = priorType === 'custom' ? '2' : '1';
+  console.log('Installation type:');
+  console.log('  [1] Express  — login + auto-configure everything with defaults');
+  console.log('  [2] Custom   — full interactive setup (ports, aliases, environments)');
+  console.log('');
+  const typeInput   = await ask(`Select [${defaultType}]: `);
+  const installType = typeInput.trim() === '2' ? 'custom' : 'express';
+  console.log('');
+
+  // ── Section A: Login ──────────────────────────────────────────────────────
+
   const email    = await ask('Aptible email: ');
   const password = await askSecret('Aptible password: ');
   console.log('');
 
-  // 4. Login (interactive — handles 2FA via stdio: inherit)
-  // Do NOT show a spinner here: aptible may prompt for a 2FA OTP code and the
-  // spinner output would hide that prompt. Print a plain line instead.
+  // Close readline before handing stdin to aptible (2FA prompt reads from fd 0).
   closeRL();
   console.log('Logging in to Aptible… (enter 2FA code if prompted)');
   const ok = await login({ email, password });
@@ -48,61 +59,48 @@ export async function runInit(args) {
   logger.success('Logged in successfully.');
   console.log('');
 
-  // 5. Discover environments
+  // ── Section B: Environment discovery & selection ──────────────────────────
+
   process.stdout.write('Discovering environments…\n');
   const environments = listEnvironments();
   logger.success(`Found ${environments.length} environment(s).`);
 
   if (environments.length === 0) {
     logger.warn('No environments found for this account.');
-    process.exit(1);
+    return;
   }
-
-  // 6. Select environments
-  console.log('');
-  console.log('Available environments:');
-  environments.forEach((env, i) => {
-    console.log(`  [${i + 1}] ${env.handle}`);
-  });
-  console.log('');
-
-  const selection = await ask(
-    `Select environments (comma-separated numbers or "all") [all]: `
-  );
 
   let selectedEnvs;
-  if (!selection.trim() || selection.trim().toLowerCase() === 'all') {
-    selectedEnvs = environments;
-  } else {
-    const indices = selection.split(',').map(s => parseInt(s.trim(), 10) - 1);
-    selectedEnvs = indices
-      .filter(i => i >= 0 && i < environments.length)
-      .map(i => environments[i]);
-  }
 
-  if (selectedEnvs.length === 0) {
-    logger.error('No valid environments selected.');
-    process.exit(1);
-  }
+  if (installType === 'custom') {
+    console.log('');
+    console.log('Available environments:');
+    environments.forEach((env, i) => console.log(`  [${i + 1}] ${env.handle}`));
+    console.log('');
 
-  // 7. Set default environment
-  console.log('');
-  console.log('Set a default environment (used when no --env flag is given):');
-  selectedEnvs.forEach((env, i) => console.log(`  [${i + 1}] ${env.handle}`));
-  console.log('  [0] None (no default)');
-  const defChoice = await ask(`Default environment (0 to skip) [1]: `);
-  const defTrimmed = defChoice.trim();
-  let defaultEnvHandle = null;
-  if (defTrimmed === '0') {
-    defaultEnvHandle = null;
-  } else {
-    const defIdx = parseInt(defTrimmed || '1', 10) - 1;
-    if (defIdx >= 0 && defIdx < selectedEnvs.length) {
-      defaultEnvHandle = selectedEnvs[defIdx].handle;
+    const selection = await ask('Select environments (comma-separated numbers or "all") [all]: ');
+
+    if (!selection.trim() || selection.trim().toLowerCase() === 'all') {
+      selectedEnvs = environments;
+    } else {
+      const indices = selection.split(',').map(s => parseInt(s.trim(), 10) - 1);
+      selectedEnvs  = indices
+        .filter(i => i >= 0 && i < environments.length)
+        .map(i => environments[i]);
     }
+
+    if (selectedEnvs.length === 0) {
+      logger.warn('No valid selection — using all environments.');
+      selectedEnvs = environments;
+    }
+  } else {
+    // Express: auto-select all
+    selectedEnvs = environments;
+    logger.info(`All ${environments.length} environment(s) will be configured.`);
   }
 
-  // 8. For each environment, discover databases and assign ports
+  // ── Section C: Database configuration ────────────────────────────────────
+
   const configEnvironments = {};
   let portCounter = 55550;
 
@@ -112,84 +110,106 @@ export async function runInit(args) {
     const databases = listDatabases(env.handle);
     logger.success(`Found ${databases.length} database(s) in ${env.handle}.`);
 
-    if (databases.length === 0) continue;
+    if (databases.length === 0) {
+      configEnvironments[env.handle] = { alias: env.handle, databases: {} };
+      continue;
+    }
 
-    // Auto-assign ports and deduplicated aliases
+    // Default alias = the database's own handle (user can change in Custom)
     const assignedDbs = [];
     for (const db of databases) {
-      const rawAlias = suggestDbAlias(db.handle, databases);
-      const alias    = deduplicateAlias(rawAlias, assignedDbs);
-      assignedDbs.push({ ...db, assignedPort: portCounter++, suggestedAlias: alias });
+      assignedDbs.push({
+        ...db,
+        assignedPort:   portCounter++,
+        suggestedAlias: deduplicateAlias(db.handle, assignedDbs),
+      });
     }
 
-    // Show proposed config
-    console.log('');
-    console.log(`  Databases in ${env.handle}:`);
-    assignedDbs.forEach((db, i) => {
-      console.log(`  [${i + 1}] ${db.handle}  →  alias: ${db.suggestedAlias}  port: ${db.assignedPort}  (${db.type})`);
-    });
+    if (installType === 'custom') {
+      // Show proposed config
+      console.log('');
+      console.log(`  Databases in ${env.handle}:`);
+      assignedDbs.forEach((db, i) => {
+        console.log(`  [${i + 1}] ${db.handle}  →  alias: ${db.suggestedAlias}  port: ${db.assignedPort}  (${db.type})`);
+      });
 
-    // 9. Customize ports?
-    const customizePorts = await ask('  Customize ports? (y/N) [N]: ');
-    if (customizePorts.match(/^y(es)?$/i)) {
-      for (const db of assignedDbs) {
-        const newPort = await ask(`    Port for ${db.handle} [${db.assignedPort}]: `);
-        if (newPort.trim()) db.assignedPort = parseInt(newPort.trim(), 10);
+      // Customize ports?
+      const customizePorts = await ask('  Customize ports? (y/N) [N]: ');
+      if (customizePorts.match(/^y(es)?$/i)) {
+        for (const db of assignedDbs) {
+          const input = await ask(`    Port for ${db.handle} [${db.assignedPort}]: `);
+          if (input.trim()) db.assignedPort = parseInt(input.trim(), 10);
+        }
       }
-    }
 
-    // 10. Customize aliases?
-    const customizeAliases = await ask('  Customize aliases? (y/N) [N]: ');
-    if (customizeAliases.match(/^y(es)?$/i)) {
-      for (const db of assignedDbs) {
-        const newAlias = await ask(`    Alias for ${db.handle} [${db.suggestedAlias}]: `);
-        if (newAlias.trim()) db.suggestedAlias = deduplicateAlias(newAlias.trim(), assignedDbs);
+      // Customize aliases?
+      const customizeAliases = await ask('  Customize aliases? (y/N) [N]: ');
+      if (customizeAliases.match(/^y(es)?$/i)) {
+        for (const db of assignedDbs) {
+          const input = await ask(`    Alias for ${db.handle} [${db.suggestedAlias}]: `);
+          if (input.trim()) db.suggestedAlias = deduplicateAlias(input.trim(), assignedDbs);
+        }
       }
-    }
 
-    // Build environment alias
-    const envAlias = suggestEnvAlias(env.handle);
-    const confirmedEnvAlias = await ask(`  Alias for this environment [${envAlias}]: `);
-
-    const databasesConfig = {};
-    for (const db of assignedDbs) {
-      databasesConfig[db.handle] = {
-        alias: db.suggestedAlias,
-        port:  db.assignedPort,
-        type:  db.type,
+      // Environment alias
+      const envInput = await ask(`  Alias for this environment [${env.handle}]: `);
+      configEnvironments[env.handle] = {
+        alias:     envInput.trim() || env.handle,
+        databases: buildDatabasesConfig(assignedDbs),
+      };
+    } else {
+      // Express: use handle as alias, no prompts
+      configEnvironments[env.handle] = {
+        alias:     env.handle,
+        databases: buildDatabasesConfig(assignedDbs),
       };
     }
-
-    configEnvironments[env.handle] = {
-      alias:     confirmedEnvAlias.trim() || envAlias,
-      databases: databasesConfig,
-    };
   }
 
-  // 11. Write config
+  // ── Section D: Default environment ───────────────────────────────────────
+
+  let defaultEnvHandle = null;
+
+  if (selectedEnvs.length === 1) {
+    // Single env: set it as default automatically
+    defaultEnvHandle = selectedEnvs[0].handle;
+  } else if (installType === 'custom') {
+    console.log('');
+    console.log('Set a default environment (used when no --env flag is given):');
+    selectedEnvs.forEach((env, i) => console.log(`  [${i + 1}] ${env.handle}`));
+    console.log('  [0] None (no default)');
+    const defInput   = await ask('Default environment (0 to skip) [1]: ');
+    const defTrimmed = defInput.trim();
+    if (defTrimmed !== '0') {
+      const defIdx = parseInt(defTrimmed || '1', 10) - 1;
+      if (defIdx >= 0 && defIdx < selectedEnvs.length) {
+        defaultEnvHandle = selectedEnvs[defIdx].handle;
+      }
+    }
+  }
+  // Express with multiple envs: leave no default (user can set with aptunnel config --set-default)
+
+  // ── Write config ──────────────────────────────────────────────────────────
+
   const config = {
-    version: 1,
-    credentials: { email },
+    version:      1,
+    install_type: installType,
+    credentials:  { email },
     defaults: {
       ...(defaultEnvHandle ? { environment: defaultEnvHandle } : {}),
       lifetime: '7d',
     },
-    environments: configEnvironments,
-    tunnel_defaults: {
-      start_port:    55550,
-      port_increment: 1,
-    },
+    environments:    configEnvironments,
+    tunnel_defaults: { start_port: 55550, port_increment: 1 },
   };
 
-  // All prompts done — close readline before exiting
   closeRL();
-
   save(config);
   savePassword(password);
 
   console.log('');
   logger.success(`Config written to ${getConfigPath()}`);
-  logger.success('Credentials stored in ' + getConfigDir() + '/.credentials (mode 600)');
+  logger.success(`Credentials stored in ${getConfigDir()}/.credentials (encrypted)`);
   console.log('');
   logger.section('Next steps');
   console.log('  aptunnel status         — view all tunnel states');
@@ -199,75 +219,33 @@ export async function runInit(args) {
   console.log('');
 }
 
-// ─── Alias generation ─────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/**
- * Suggest a short alias for an environment handle.
- * e.g. "ekare-inc-development-gfpkcova" → "dev"
- */
-function suggestEnvAlias(handle) {
-  const words = handle.toLowerCase().split(/[-_]/);
-
-  const envWords = { development: 'dev', staging: 'staging', production: 'prod', test: 'test', testing: 'test' };
-  for (const word of words) {
-    if (envWords[word]) return envWords[word];
+function buildDatabasesConfig(assignedDbs) {
+  const result = {};
+  for (const db of assignedDbs) {
+    result[db.handle] = { alias: db.suggestedAlias, port: db.assignedPort, type: db.type };
   }
-
-  // Use the most informative non-hash word
-  const meaningful = words.filter(w => w.length > 2 && !/^[a-z0-9]{6,}$/.test(w) && !['inc', 'com', 'the'].includes(w));
-  return meaningful[meaningful.length - 1] ?? words[0];
-}
-
-/**
- * Suggest a short alias for a database handle.
- * e.g. "ekaredb-dev" → "dev-db", "my-company-redis" → "redis"
- */
-function suggestDbAlias(handle, allDbs) {
-  const lower = handle.toLowerCase();
-
-  // Detect DB type from handle
-  let type = '';
-  if (lower.includes('redis'))    type = 'redis';
-  if (lower.includes('postgres') || lower.includes('pg')) type = 'pg';
-  if (lower.includes('mysql'))    type = 'mysql';
-  if (lower.includes('mongo'))    type = 'mongo';
-
-  // Detect environment part
-  let env = '';
-  const envWords = { dev: 'dev', development: 'dev', staging: 'stg', prod: 'prod', production: 'prod', test: 'test' };
-  for (const [word, alias] of Object.entries(envWords)) {
-    if (lower.includes(word)) { env = alias; break; }
-  }
-
-  if (type && env)  return `${env}-${type}`;
-  if (type)         return type;
-  if (env)          return `${env}-db`;
-
-  // Fallback: strip common company prefixes, take last meaningful segment
-  const parts = lower.split(/[-_]/).filter(p => p.length > 1 && !/^\d+$/.test(p));
-  return parts[parts.length - 1] ?? handle;
+  return result;
 }
 
 function deduplicateAlias(alias, allDbs) {
   const used = new Set(allDbs.map(d => d.suggestedAlias));
   if (!used.has(alias)) return alias;
   let i = 2;
-  while (used.has(`${alias}${i}`)) i++;
-  return `${alias}${i}`;
+  while (used.has(`${alias}-${i}`)) i++;
+  return `${alias}-${i}`;
 }
 
 // ─── Readline helpers ─────────────────────────────────────────────────────────
 // We use a SINGLE readline interface throughout init and only close it at the
 // very end, right before handing stdin back to the aptible child process.
-// Opening/closing multiple readline interfaces causes process.stdin to be
-// paused between calls, which makes subsequent prompts appear to hang.
 
 let _rl = null;
 
 function getRL() {
   if (!_rl) {
     _rl = createInterface({ input: process.stdin, output: process.stdout });
-    // Prevent readline from keeping the event loop alive indefinitely
     _rl.on('close', () => { _rl = null; });
   }
   return _rl;
@@ -278,9 +256,6 @@ function closeRL() {
     _rl.close();
     _rl = null;
   }
-  // Do NOT call process.stdin.resume() here. Flowing mode with no listener
-  // discards keystrokes. Child processes (aptible) read from fd 0 directly
-  // at OS level regardless of Node.js stream state.
 }
 
 function ask(prompt) {
@@ -291,8 +266,6 @@ function ask(prompt) {
 
 function askSecret(prompt) {
   // Close the shared readline so we can take over stdin directly.
-  // Monkey-patching rl._writeToOutput (private API) is unreliable across
-  // Node.js versions — reading raw characters is the portable alternative.
   if (_rl) { _rl.close(); _rl = null; }
 
   return new Promise((resolve) => {
@@ -310,14 +283,11 @@ function askSecret(prompt) {
         if (char === '\r' || char === '\n') {
           process.stdin.removeListener('data', onData);
           if (isTTY) process.stdin.setRawMode(false);
-          // Pause so Node.js stops consuming keystrokes that belong to child
-          // processes (e.g. aptible login waiting for a 2FA OTP).
           process.stdin.pause();
           process.stdout.write('\n');
           resolve(chars.join(''));
           return;
         } else if (char === '\u0003') {
-          // Ctrl+C
           process.stdout.write('\n');
           process.exit(0);
         } else if (char === '\u007f' || char === '\b') {

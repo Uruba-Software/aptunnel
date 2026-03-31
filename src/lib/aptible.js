@@ -2,6 +2,7 @@ import { spawnSync, spawn } from 'child_process';
 import { readFileSync, existsSync, writeFileSync, openSync, closeSync } from 'fs';
 import { homedir, tmpdir } from 'os';
 import { join } from 'path';
+import { isPortInUse } from './platform.js';
 
 // On Windows, .cmd wrappers require a shell to be resolved by CreateProcess.
 const SHELL_OPT = process.platform === 'win32' ? { shell: true } : {};
@@ -234,7 +235,17 @@ export function openTunnel({ dbHandle, environment, port }) {
       if (lower.includes('connect at') || lower.includes('connected.')) {
         clearInterval(poll);
         const conn = parseConnectionInfo(logContent, port);
-        resolve({ pid: child.pid, port, ...conn });
+
+        // On Windows, child.pid is cmd.exe (shell wrapper). cmd.exe may exit after
+        // launching aptible, leaving the real aptible process alive but with a
+        // different PID. Query the port owner instead so status correctly shows UP.
+        let pid = child.pid;
+        if (process.platform === 'win32') {
+          const portState = isPortInUse(port);
+          if (portState.inUse && portState.pid) pid = portState.pid;
+        }
+
+        resolve({ pid, port, ...conn });
         return;
       }
 
