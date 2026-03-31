@@ -22,7 +22,7 @@ export async function runInit(args) {
 
   // 2. Check existing config
   if (exists()) {
-    const reinit = await ask('Config already exists. Reinitialize? (y/N) ');
+    const reinit = await ask('Config already exists. Reinitialize? (y/N) [N]: ');
     if (!reinit.match(/^y(es)?$/i)) {
       logger.info('Aborted.');
       return;
@@ -67,7 +67,7 @@ export async function runInit(args) {
   console.log('');
 
   const selection = await ask(
-    `Select environments (comma-separated numbers, "all", or press Enter for all): `
+    `Select environments (comma-separated numbers or "all") [all]: `
   );
 
   let selectedEnvs;
@@ -129,7 +129,7 @@ export async function runInit(args) {
     });
 
     // 9. Customize ports?
-    const customizePorts = await ask('  Customize ports? (y/N) ');
+    const customizePorts = await ask('  Customize ports? (y/N) [N]: ');
     if (customizePorts.match(/^y(es)?$/i)) {
       for (const db of assignedDbs) {
         const newPort = await ask(`    Port for ${db.handle} [${db.assignedPort}]: `);
@@ -138,7 +138,7 @@ export async function runInit(args) {
     }
 
     // 10. Customize aliases?
-    const customizeAliases = await ask('  Customize aliases? (y/N) ');
+    const customizeAliases = await ask('  Customize aliases? (y/N) [N]: ');
     if (customizeAliases.match(/^y(es)?$/i)) {
       for (const db of assignedDbs) {
         const newAlias = await ask(`    Alias for ${db.handle} [${db.suggestedAlias}]: `);
