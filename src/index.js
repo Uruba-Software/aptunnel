@@ -107,6 +107,13 @@ try {
       break;
     }
 
+    case '_complete': {
+      // Hidden subcommand used by shell completion scripts — outputs DB/ENV lists.
+      const { runComplete } = await import('./commands/complete.js');
+      runComplete(rest);
+      break;
+    }
+
     default: {
       // Catch misplaced flags (e.g. `aptunnel --env=staging dev-db`)
       if (command.startsWith('--')) {

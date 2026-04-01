@@ -8,19 +8,7 @@ const STATIC_CMDS = ['init', 'login', 'status', 'config', 'dbs', 'completions', 
 
 // ─── Bash ─────────────────────────────────────────────────────────────────────
 
-/**
- * Generate bash completion script.
- *
- * Config YAML indentation (js-yaml, 2-space):
- *   environments:          (0)
- *     <env-handle>:        (2)  ← env handle
- *       alias: <val>       (4)  ← env alias
- *       databases:         (4)
- *         <db-handle>:     (6)  ← db handle
- *           alias: <val>   (8)  ← db alias
- */
 export function bashScript() {
-  const configPath = getConfigPath();
   const cmds = STATIC_CMDS.join(' ');
   return `#!/usr/bin/env bash
 # aptunnel bash completion
@@ -33,58 +21,45 @@ _aptunnel_completions() {
   cur="\${COMP_WORDS[COMP_CWORD]}"
   prev="\${COMP_WORDS[COMP_CWORD-1]}"
 
-  local config="${configPath}"
-  local db_aliases db_handles env_aliases env_handles all_dbs all_envs
-  db_aliases="" db_handles="" env_aliases="" env_handles=""
+  # Fetch all completion data from aptunnel in a single call.
+  # aptunnel _complete all outputs "DB <name>" and "ENV <name>" lines.
+  local _out all_dbs all_envs
+  _out=$(aptunnel _complete all 2>/dev/null)
+  all_dbs=$(printf '%s\\n' "$_out" | awk '/^DB /{print $2}' | tr '\\n' ' ')
+  all_envs=$(printf '%s\\n' "$_out" | awk '/^ENV /{print $2}' | tr '\\n' ' ')
 
-  if [[ -f "$config" ]]; then
-    # DB aliases: 8-space indent (under each database entry)
-    db_aliases=$(grep -E '^        alias: ' "$config" 2>/dev/null | awk '{print $2}')
-    # DB handles: 6-space indent keys
-    db_handles=$(grep -E '^      [a-zA-Z0-9]' "$config" 2>/dev/null | sed 's/^ *//;s/:.*//')
-    # Env aliases: 4-space indent (under each environment entry)
-    env_aliases=$(grep -E '^    alias: ' "$config" 2>/dev/null | awk '{print $2}')
-    # Env handles: 2-space indent keys inside the environments: block only
-    env_handles=$(awk '/^environments:/{f=1;next} /^[a-zA-Z]/{f=0} f && /^  [a-zA-Z0-9]/{h=$0; sub(/^  /,"",h); sub(/:.*$/,"",h); print h}' "$config" 2>/dev/null)
-  fi
-
-  # Deduplicated space-separated lists
-  all_dbs=$(printf '%s\\n' $db_aliases $db_handles | grep -v '^$' | sort -u | tr '\\n' ' ')
-  all_envs=$(printf '%s\\n' $env_aliases $env_handles | grep -v '^$' | sort -u | tr '\\n' ' ')
-
-  # --env=<value>: complete just the value part
+  # --env=<value>: complete the value portion
   if [[ "\${cur}" == "--env="* ]]; then
     local pfx="\${cur#--env=}"
-    local matches
-    matches=$(compgen -W "$all_envs" -- "$pfx")
-    COMPREPLY=( $(printf '%s\\n' $matches | sed 's|^|--env=|') )
+    COMPREPLY=( $(compgen -W "$all_envs" -- "$pfx") )
+    COMPREPLY=( "\${COMPREPLY[@]/#/--env=}" )
     return 0
   fi
 
-  # Other value flags: no completion
+  # Free-form value flags — suppress completion
   if [[ "\${cur}" == "--port="* || "\${cur}" == "--email="* || "\${cur}" == "--password="* || "\${cur}" == "--lifetime="* ]]; then
     return 0
   fi
 
-  # --set-default <env>  (space-separated form)
+  # --set-default <env> (space-separated form)
   if [[ "$prev" == "--set-default" ]]; then
     COMPREPLY=( $(compgen -W "$all_envs" -- "$cur") )
     return 0
   fi
 
-  # --set-port <db>  (space-separated form)
+  # --set-port <db> (space-separated form)
   if [[ "$prev" == "--set-port" ]]; then
     COMPREPLY=( $(compgen -W "$all_dbs" -- "$cur") )
     return 0
   fi
 
-  # Determine the subcommand (first non-flag word after 'aptunnel')
+  # Find the subcommand (first non-flag word after 'aptunnel')
   local cmd=""
   local i
   for ((i=1; i<COMP_CWORD; i++)); do
     local w="\${COMP_WORDS[i]}"
-    if [[ "$w" != -* && -n "$w" ]]; then
-      cmd="$w"
+    if [[ "\$w" != -* && -n "\$w" ]]; then
+      cmd="\$w"
       break
     fi
   done
@@ -93,22 +68,24 @@ _aptunnel_completions() {
   if [[ "\${cur}" == -* ]]; then
     local flags
     case "$cmd" in
-      all)         flags="--close --force --env=" ;;
-      status)      flags="--watch" ;;
-      login)       flags="--email= --password= --lifetime= --status" ;;
-      config)      flags="--set-port --set-default --refresh --path --raw" ;;
-      dbs)         flags="--env=" ;;
-      uninstall)   flags="--force" ;;
-      "")          flags="--help --version" ;;
-      *)           flags="--close --force --port= --env=" ;;
+      all)        flags="--close --force --env=" ;;
+      status)     flags="--watch" ;;
+      login)      flags="--email= --password= --lifetime= --status" ;;
+      config)     flags="--set-port --set-default --refresh --path --raw" ;;
+      dbs)        flags="--env=" ;;
+      uninstall)  flags="--force" ;;
+      "")         flags="--help --version" ;;
+      *)          flags="--close --force --port= --env=" ;;
     esac
-    COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
+    COMPREPLY=( $(compgen -W "\$flags" -- "$cur") )
+    # Don't add a trailing space when the completion ends with '='
+    [[ \${#COMPREPLY[@]} -eq 1 && "\${COMPREPLY[0]}" == *= ]] && compopt -o nospace 2>/dev/null
     return 0
   fi
 
-  # No subcommand yet: show commands + db aliases/handles
+  # No subcommand yet: offer built-in commands + all db aliases/handles
   if [[ -z "$cmd" ]]; then
-    COMPREPLY=( $(compgen -W "${cmds} $all_dbs" -- "$cur") )
+    COMPREPLY=( $(compgen -W "${cmds} \$all_dbs" -- "$cur") )
     return 0
   fi
 
@@ -129,7 +106,6 @@ complete -F _aptunnel_completions aptunnel
 // ─── Zsh ──────────────────────────────────────────────────────────────────────
 
 export function zshScript() {
-  const configPath = getConfigPath();
   return `#compdef aptunnel
 # aptunnel zsh completion
 # Add to ~/.zshrc:
@@ -138,18 +114,13 @@ export function zshScript() {
 _aptunnel() {
   local context state state_descr line
   local -A opt_args
-  local config="${configPath}"
-  local -a db_aliases db_handles env_aliases env_handles all_dbs all_envs
 
-  if [[ -f "\$config" ]]; then
-    db_aliases=( \${(f)"$(grep -E '^        alias: ' "\$config" 2>/dev/null | awk '{print \$2}')"} )
-    db_handles=( \${(f)"$(grep -E '^      [a-zA-Z0-9]' "\$config" 2>/dev/null | sed 's/^ *//;s/:.*//')"} )
-    env_aliases=( \${(f)"$(grep -E '^    alias: ' "\$config" 2>/dev/null | awk '{print \$2}')"} )
-    env_handles=( \${(f)"$(awk '/^environments:/{f=1;next} /^[a-zA-Z]/{f=0} f && /^  [a-zA-Z0-9]/{h=\$0; sub(/^  /,"",h); sub(/:.*\$/,"",h); print h}' "\$config" 2>/dev/null)"} )
-  fi
-
-  all_dbs=( \${(u)(\${db_aliases[@]} \${db_handles[@]})} )
-  all_envs=( \${(u)(\${env_aliases[@]} \${env_handles[@]})} )
+  # Fetch completion data from aptunnel (_complete all → "DB name" / "ENV name" lines)
+  local _out
+  _out=$(aptunnel _complete all 2>/dev/null)
+  local -a all_dbs all_envs
+  all_dbs=( \${(f)"$(printf '%s\\n' "\$_out" | awk '/^DB /{print \$2}')"} )
+  all_envs=( \${(f)"$(printf '%s\\n' "\$_out" | awk '/^ENV /{print \$2}')"} )
 
   local -a cmds
   cmds=(
@@ -232,62 +203,25 @@ _aptunnel "\$@"
 // ─── Fish ─────────────────────────────────────────────────────────────────────
 
 export function fishScript() {
-  const configPath = getConfigPath();
   return `# aptunnel fish completion
 # Copy to ~/.config/fish/completions/aptunnel.fish
 # or run: aptunnel completions install
 
-set -l config_path "${configPath}"
-
-# Extract DB aliases (8-space indent)
-function __aptunnel_db_aliases
-  if test -f $config_path
-    grep -E '^        alias: ' $config_path 2>/dev/null | awk '{print $2}'
-  end
-end
-
-# Extract DB handles (6-space indent)
-function __aptunnel_db_handles
-  if test -f $config_path
-    grep -E '^      [a-zA-Z0-9]' $config_path 2>/dev/null | sed 's/^ *//;s/:.*//'
-  end
-end
-
-# All DB identifiers (aliases + handles, deduplicated)
+# DB aliases + handles from config
 function __aptunnel_dbs
-  begin
-    __aptunnel_db_aliases
-    __aptunnel_db_handles
-  end | sort -u
+  aptunnel _complete dbs 2>/dev/null
 end
 
-# Extract env aliases (4-space indent)
-function __aptunnel_env_aliases
-  if test -f $config_path
-    grep -E '^    alias: ' $config_path 2>/dev/null | awk '{print $2}'
-  end
-end
-
-# Extract env handles (inside environments: block, 2-space indent)
-function __aptunnel_env_handles
-  if test -f $config_path
-    awk '/^environments:/{f=1;next} /^[a-zA-Z]/{f=0} f && /^  [a-zA-Z0-9]/{h=$0; sub(/^  /,"",h); sub(/:.*$/,"",h); print h}' $config_path 2>/dev/null
-  end
-end
-
-# All env identifiers
+# Env aliases + handles from config
 function __aptunnel_envs
-  begin
-    __aptunnel_env_aliases
-    __aptunnel_env_handles
-  end | sort -u
+  aptunnel _complete envs 2>/dev/null
 end
 
 function __aptunnel_no_subcommand
   not __fish_seen_subcommand_from init login status config dbs completions uninstall all help (__aptunnel_dbs)
 end
 
-# Static commands
+# Built-in commands
 complete -c aptunnel -f -n '__aptunnel_no_subcommand' -a 'init'        -d 'Setup wizard'
 complete -c aptunnel -f -n '__aptunnel_no_subcommand' -a 'login'       -d 'Authenticate with Aptible'
 complete -c aptunnel -f -n '__aptunnel_no_subcommand' -a 'status'      -d 'Show all tunnel statuses'
@@ -306,29 +240,29 @@ complete -c aptunnel -f -n '__fish_seen_subcommand_from completions' -a 'zsh'   
 complete -c aptunnel -f -n '__fish_seen_subcommand_from completions' -a 'fish'    -d 'Fish completion script'
 complete -c aptunnel -f -n '__fish_seen_subcommand_from completions' -a 'install' -d 'Auto-install for current shell'
 
-# Global flags (tunnel commands)
-complete -c aptunnel -l close   -d 'Close tunnel(s)'
-complete -c aptunnel -l force   -d 'Force port selection / release'
-complete -c aptunnel -l port    -d 'Override local port' -r
-complete -c aptunnel -l env     -d 'Target environment' -r -a '(__aptunnel_envs)'
+# Global tunnel flags
+complete -c aptunnel -l close -d 'Close tunnel(s)'
+complete -c aptunnel -l force -d 'Force port selection / release'
+complete -c aptunnel -l port  -d 'Override local port' -r
+complete -c aptunnel -l env   -d 'Target environment' -r -a '(__aptunnel_envs)'
 
-# status flag
+# status
 complete -c aptunnel -n '__fish_seen_subcommand_from status' -l watch -d 'Live-refresh every 2 seconds'
 
-# login flags
+# login
 complete -c aptunnel -n '__fish_seen_subcommand_from login' -l email    -d 'Aptible email' -r
 complete -c aptunnel -n '__fish_seen_subcommand_from login' -l password -d 'Aptible password' -r
 complete -c aptunnel -n '__fish_seen_subcommand_from login' -l lifetime -d 'Token lifetime' -r -a '1d 2d 3d 7d'
 complete -c aptunnel -n '__fish_seen_subcommand_from login' -l status   -d 'Show token info only'
 
-# config flags
+# config
 complete -c aptunnel -n '__fish_seen_subcommand_from config' -l set-port    -d 'Set port for a database' -r -a '(__aptunnel_dbs)'
 complete -c aptunnel -n '__fish_seen_subcommand_from config' -l set-default -d 'Set default environment' -r -a '(__aptunnel_envs)'
 complete -c aptunnel -n '__fish_seen_subcommand_from config' -l refresh     -d 'Re-discover databases'
 complete -c aptunnel -n '__fish_seen_subcommand_from config' -l path        -d 'Print config file path'
 complete -c aptunnel -n '__fish_seen_subcommand_from config' -l raw         -d 'Include password in output'
 
-# Global flags
+# Global
 complete -c aptunnel -s h -l help    -d 'Show help'
 complete -c aptunnel -s v -l version -d 'Show version'
 `;
@@ -336,10 +270,6 @@ complete -c aptunnel -s v -l version -d 'Show version'
 
 // ─── Install ──────────────────────────────────────────────────────────────────
 
-/**
- * Auto-detect shell and install the completion script.
- * @param {boolean} quiet  Suppress "no shell detected" warning (used by init)
- */
 export function installCompletions(quiet = false) {
   const shell = detectShell();
 

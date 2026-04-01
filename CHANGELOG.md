@@ -4,6 +4,20 @@ All notable changes to aptunnel are documented here.
 
 ---
 
+## [1.4.4] — 2026-04-01
+
+### Fixed
+- **Completions: replaced YAML grep with `aptunnel _complete`** — shell scripts were parsing
+  the config YAML with `grep`/`awk` patterns that silently returned incomplete or wrong results
+  (e.g. only one DB per environment). Bash/zsh/fish completion scripts now call
+  `aptunnel _complete all` which uses the same `config-manager.js` as the rest of the CLI,
+  guaranteeing the full and correct DB and environment list every time.
+- **Added hidden `aptunnel _complete [all|dbs|envs]` subcommand** — for use by shell
+  completion scripts only; outputs `DB <name>` / `ENV <name>` lines (with prefix) or plain
+  names for direct use.
+
+---
+
 ## [1.4.3] — 2026-04-01
 
 ### Fixed
