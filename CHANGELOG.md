@@ -4,6 +4,16 @@ All notable changes to aptunnel are documented here.
 
 ---
 
+## [1.4.5] — 2026-04-01
+
+### Fixed
+- **Bash: `--env=<TAB>` now shows env list** — bash splits `--env=value` at `=` by default
+  (making `cur=""` instead of `cur="--env=..."`), so the env-value check never matched.
+  Fixed by removing `=` from `COMP_WORDBREAKS` at the start of the completion function,
+  which keeps `--flag=value` as a single token.
+
+---
+
 ## [1.4.4] — 2026-04-01
 
 ### Fixed

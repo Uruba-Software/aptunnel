@@ -18,6 +18,12 @@ export function bashScript() {
 _aptunnel_completions() {
   local cur prev
   COMPREPLY=()
+
+  # Remove '=' from word-break chars so --flag=value is treated as a single
+  # token. Without this, bash splits --env=staging into ['--env', '=', 'staging']
+  # and cur becomes "" when the user types --env=<TAB>.
+  local COMP_WORDBREAKS="\${COMP_WORDBREAKS//=/}"
+
   cur="\${COMP_WORDS[COMP_CWORD]}"
   prev="\${COMP_WORDS[COMP_CWORD-1]}"
 

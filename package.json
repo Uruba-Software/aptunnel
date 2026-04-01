@@ -1,6 +1,6 @@
 {
   "name": "aptunnel",
-  "version": "1.4.4",
+  "version": "1.4.5",
   "description": "Cross-platform Aptible tunnel manager — multi-tunnel, auto-discovery, background process management",
   "type": "module",
   "bin": {
