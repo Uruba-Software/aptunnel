@@ -4,6 +4,25 @@ All notable changes to aptunnel are documented here.
 
 ---
 
+## [1.4.3] — 2026-04-01
+
+### Fixed
+- **Shell completions rewritten** — `aptunnel <TAB>` now correctly shows db aliases, db handles,
+  and built-in commands. Previously the awk patterns were wrong, mixing env aliases into the
+  db list and finding nothing for environments. Fixed by using `grep` with exact indentation
+  (8-space for db aliases, 6-space for db handles, 4-space for env aliases, awk state-machine
+  for env handles).
+- **Context-aware flag completions** — `aptunnel status --<TAB>` shows only `--watch`;
+  `aptunnel all --<TAB>` shows `--close --force --env=`; tunnel commands show
+  `--close --force --port= --env=`; etc.
+- **`--env=<value>` completions** — typing `--env=<TAB>` now completes from env aliases and
+  handles (bash, zsh, fish all supported).
+- **Missing commands added** — `dbs` and `uninstall` were missing from completion lists.
+- **`aptunnel init` auto-installs completions** — after writing the config, init now calls
+  `installCompletions()` automatically so users don't have to run it manually.
+
+---
+
 ## [1.4.2] — 2026-04-01
 
 ### Fixed

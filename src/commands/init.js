@@ -2,6 +2,7 @@ import { createInterface } from 'readline';
 import { logger } from '../lib/logger.js';
 import { isInstalled, login, listEnvironments, listDatabases } from '../lib/aptible.js';
 import { installInstructions } from '../lib/platform.js';
+import { installCompletions } from '../lib/completions.js';
 import {
   exists, save, savePassword, getConfigDir, getConfigPath, nextAvailablePort, getInstallType,
 } from '../lib/config-manager.js';
@@ -184,6 +185,10 @@ export async function runInit(args) {
   console.log('');
   logger.success(`Config written to ${getConfigPath()}`);
   logger.success(`Credentials stored in ${getConfigDir()}/.credentials (encrypted)`);
+  console.log('');
+  logger.section('Shell completions');
+  installCompletions(/* quiet= */ false);
+
   console.log('');
   logger.section('Next steps');
   console.log('  aptunnel status         — view all tunnel states');
