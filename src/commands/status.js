@@ -14,6 +14,10 @@ export function runStatus(args = []) {
   const doWatch = Array.isArray(args) && args.includes('--watch');
 
   if (doWatch) {
+    // Signal to the global SIGINT handler that Ctrl+C should NOT kill tunnels —
+    // we are only observing, not managing them.
+    process.__aptunnelNoCleanup = true;
+
     const render = () => {
       process.stdout.write('\x1B[2J\x1B[H');
       printStatus();

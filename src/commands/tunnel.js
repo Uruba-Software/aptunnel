@@ -139,8 +139,12 @@ async function handleAll({ doClose, envArg, doForce }) {
   logger.plain(chalk.bold(header));
   logger.plain('─'.repeat(header.length));
   for (const r of results) {
-    const status = r.success ? chalk.green('UP') : chalk.red('FAILED');
-    logger.plain(`${r.db.alias.padEnd(labelW)}  ${String(r.db.port).padEnd(6)}  ${status}`);
+    if (r.success) {
+      logger.plain(`${r.db.alias.padEnd(labelW)}  ${String(r.db.port).padEnd(6)}  ${chalk.green('UP')}`);
+    } else {
+      const reasonStr = r.reason ? chalk.dim(`  (${r.reason})`) : '';
+      logger.plain(`${r.db.alias.padEnd(labelW)}  ${String(r.db.port).padEnd(6)}  ${chalk.red('FAILED')}${reasonStr}`);
+    }
   }
 }
 
@@ -162,13 +166,13 @@ async function openOneTunnel({ db, environment, port, id, doForce, skipRelogin =
       const free = findFreePort(port + 1);
       if (free === null) {
         logger.warn(`Port ${port} is in use and no free port was found nearby. Use --port=<N> to specify one.`);
-        return { success: false };
+        return { success: false, reason: `port ${port} in use, no free port found nearby` };
       }
       logger.info(`Port ${port} is in use — switching to port ${free}.`);
       port = free;
     } else {
       logger.warn(`Port ${port} is already in use (PID ${portState.pid}). Use --force to auto-select a free port, or --port=<N>.`);
-      return { success: false };
+      return { success: false, reason: `port ${port} in use (PID ${portState.pid}) — use --force` };
     }
   }
 
@@ -200,24 +204,24 @@ async function openOneTunnel({ db, environment, port, id, doForce, skipRelogin =
         const email    = config.credentials?.email;
         if (!email || !password) {
           spinner.fail('Cannot re-authenticate: credentials not found. Run `aptunnel login`.');
-          return { success: false };
+          return { success: false, reason: 'credentials missing — run `aptunnel login`' };
         }
         const ok = await login({ email, password });
         if (!ok) {
           spinner.fail('Re-authentication failed. Run `aptunnel login`.');
-          return { success: false };
+          return { success: false, reason: 're-authentication failed — run `aptunnel login`' };
         }
         return attempt(true);
       }
 
       if (err.message === 'PORT_IN_USE') {
         spinner.fail(`Port ${port} is in use. Use --port=<N> to specify a different port.`);
-        return { success: false };
+        return { success: false, reason: `port ${port} in use — use --port=<N>` };
       }
 
       spinner.fail(`Failed to open tunnel to ${db.alias}: ${err.message}`);
       logger.dim(`  Log: ${logFilePath(id)}`);
-      return { success: false };
+      return { success: false, reason: err.message };
     }
   }
 

@@ -4,6 +4,17 @@ All notable changes to aptunnel are documented here.
 
 ---
 
+## [1.4.2] — 2026-04-01
+
+### Fixed
+- **`status --watch` Ctrl+C no longer kills tunnels** — pressing Ctrl+C while watching now
+  just exits the watch, leaving all background tunnels running. Previously the global SIGINT
+  handler was closing every tunnel on exit regardless of which command was running.
+- **`aptunnel all` summary now shows failure reason** — instead of just `FAILED`, the summary
+  table now shows why each tunnel failed, e.g. `FAILED  (port 55550 in use (PID 1234) — use --force)`.
+
+---
+
 ## [1.4.1] — 2026-04-01
 
 ### Changed

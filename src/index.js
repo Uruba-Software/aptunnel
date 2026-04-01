@@ -17,6 +17,12 @@ const pkg        = require(resolve(__dirname, '../package.json'));
 // ─── Signal handling — clean up tunnels on exit ───────────────────────────────
 
 async function gracefulShutdown(signal) {
+  // Read-only commands (e.g. status --watch) set this flag so Ctrl+C doesn't
+  // kill background tunnels that were opened by a different invocation.
+  if (process.__aptunnelNoCleanup) {
+    process.exit(0);
+  }
+
   // Only run cleanup if tunnels are open
   try {
     const { getAllRunningTunnels, cleanup } = await import('./lib/process-manager.js');
