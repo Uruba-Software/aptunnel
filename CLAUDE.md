@@ -27,18 +27,21 @@ When the major version increases, both minor and patch reset to 0 (`1.2.3 → 2.
    - Write a clear, user-facing commit message — it becomes the GitHub release notes.
 3. **Push** to `main`.
 4. **If version was bumped**: create a GitHub release (not just a tag) so npm CI publishes
-   and release notes are visible on GitHub:
+   and release notes are visible on GitHub. Extract the release notes from CHANGELOG.md
+   (the section for the new version) — do NOT use the raw commit message body.
    ```
    git tag v<new-version>
    git push origin v<new-version>
-   gh release create v<new-version> --title "v<new-version>" --notes "<commit message body>"
+   # Extract the new version's section from CHANGELOG.md and use as release notes:
+   gh release create v<new-version> --title "v<new-version>" --notes "$(awk '/^## \[<new-version>\]/{found=1; next} found && /^## \[/{exit} found{print}' CHANGELOG.md | sed '/^[[:space:]]*$/d' | head -50)"
    ```
    Example: bumping to `1.1.0`:
    - Update package.json → `"version": "1.1.0"`
+   - Add `## [1.1.0] — YYYY-MM-DD` section to CHANGELOG.md
    - `git add . && git commit -m "feat: add dbs command and env selection improvements"`
    - `git push origin main`
    - `git tag v1.1.0 && git push origin v1.1.0`
-   - `gh release create v1.1.0 --title "v1.1.0" --notes "$(git log -1 --pretty=%B)"`
+   - `gh release create v1.1.0 --title "v1.1.0" --notes "$(awk '/^## \[1\.1\.0\]/{found=1; next} found && /^## \[/{exit} found{print}' CHANGELOG.md)"`
 
 CI will then run all tests (9 combinations: 3 OS × 3 Node versions) and publish
 to npm automatically if everything passes.

@@ -79,8 +79,7 @@ Same login step, then full interactive setup:
 
 1. Select which environments to include
 2. Optionally customise port numbers and aliases for each database
-3. Choose a default environment
-4. Writes `~/.aptunnel/config.yaml`
+3. Writes `~/.aptunnel/config.yaml`
 
 **Example Custom session:**
 
@@ -97,8 +96,6 @@ Select environments (comma-separated numbers or "all") [all]: 1,3
 
   Customize aliases? (y/N) [N]: y
     Alias for mydb-prod [mydb-prod]: prod-db
-
-Set a default environment (0 to skip) [1]: 1
 ```
 
 The chosen install type is saved in `config.yaml` and used as the default on future `aptunnel init` runs.
@@ -230,7 +227,6 @@ credentials:
   email: you@company.com
 
 defaults:
-  environment: my-env-development   # omitted if you chose "no default" during init
   lifetime: 7d
 
 environments:
@@ -317,7 +313,7 @@ On `aptunnel status`, each PID file is checked to determine if the process is st
 
 When you close a tunnel (`aptunnel dev-db --close`), aptunnel kills the process and cleans up PID/log files.
 
-Pressing **Ctrl+C** while aptunnel is running closes all open tunnels before exiting.
+Pressing **Ctrl+C** while a tunnel command is running closes any tunnels opened in that session before exiting. In `status --watch` mode, Ctrl+C exits the watch loop without affecting background tunnels.
 
 **Windows note:** On Windows the tunnel process is not fully detached from the terminal session. If you close the terminal window while tunnels are running, they will be terminated. Re-open them with `aptunnel <alias>` or `aptunnel all`.
 
@@ -341,10 +337,7 @@ Pressing **Ctrl+C** while aptunnel is running closes all open tunnels before exi
 
 ## Contributing
 
-1. Fork the repo
-2. Create a branch: `git checkout -b my-feature`
-3. Make your changes and add tests
-4. Open a pull request against `main`
+See [CONTRIBUTING.md](CONTRIBUTING.md) for local dev setup, architecture overview, and the release process.
 
 ---
 
