@@ -1,7 +1,8 @@
+import { createInterface } from 'readline';
 import { logger } from '../lib/logger.js';
 import { isInstalled, openTunnel, login } from '../lib/aptible.js';
 import {
-  getDatabase, getAllTunnelTargets, getDefaultEnv, readPassword, load, getEnvironment,
+  getDatabase, getAllTunnelTargets, getAllDatabases, readPassword, load, getEnvironment,
 } from '../lib/config-manager.js';
 import { isPortInUse, killProcess } from '../lib/platform.js';
 import {
@@ -58,21 +59,46 @@ async function handleOne({ alias, doClose, doForce, portOverride, envOverride })
 
 // ─── All tunnels ──────────────────────────────────────────────────────────────
 
+const PROD_RE = /\b(prod|production|live)\b/i;
+
 async function handleAll({ doClose, envArg, doForce }) {
-  const config = load();
-  const envHandle = envArg
-    ? (getEnvironment(envArg) ?? envArg)
-    : (config.defaults?.environment ?? null);
+  let targets;
+  let envDesc;
 
-  if (!envHandle) {
-    logger.error('No default environment configured. Use --env=<alias> or run `aptunnel init`.');
-    process.exit(1);
-  }
+  if (envArg) {
+    const envHandle = getEnvironment(envArg) ?? envArg;
+    targets = getAllTunnelTargets(envHandle);
+    envDesc = envHandle;
+    if (targets.length === 0) {
+      logger.warn(`No databases configured for environment: ${envHandle}`);
+      return;
+    }
+  } else {
+    // No --env: operate across all configured environments
+    targets = getAllDatabases();
+    envDesc = 'all environments';
+    if (targets.length === 0) {
+      logger.warn('No databases configured. Run `aptunnel init`.');
+      return;
+    }
 
-  const targets = getAllTunnelTargets(envHandle);
-  if (targets.length === 0) {
-    logger.warn(`No databases configured for environment: ${envHandle}`);
-    return;
+    if (!doClose) {
+      // Warn if any env handle or alias looks like production
+      const config = load();
+      const prodEnvs = [...new Set(targets.map(t => t.environment))].filter(h => {
+        const envAlias = config.environments?.[h]?.alias ?? '';
+        return PROD_RE.test(h) || PROD_RE.test(envAlias);
+      });
+
+      if (prodEnvs.length > 0) {
+        logger.warn(`Production environment(s) detected: ${prodEnvs.join(', ')}`);
+        const ok = await confirm('Open tunnels to production? (y/N) [N]: ');
+        if (!ok) {
+          logger.info('Aborted.');
+          return;
+        }
+      }
+    }
   }
 
   if (doClose) {
@@ -83,7 +109,7 @@ async function handleAll({ doClose, envArg, doForce }) {
     return;
   }
 
-  logger.info(`Opening ${targets.length} tunnel(s) for environment: ${envHandle}`);
+  logger.info(`Opening ${targets.length} tunnel(s) for ${envDesc}`);
   console.log('');
 
   const results = [];
@@ -93,7 +119,7 @@ async function handleAll({ doClose, envArg, doForce }) {
     const id = toIdentifier(db.alias);
     const result = await openOneTunnel({
       db,
-      environment: envHandle,
+      environment: db.environment,
       port: db.port,
       id,
       doForce,
@@ -277,4 +303,14 @@ function parseFlag(args, flag) {
 
 function sleep(ms) {
   return new Promise(r => setTimeout(r, ms));
+}
+
+function confirm(prompt) {
+  return new Promise(resolve => {
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    rl.question(prompt, answer => {
+      rl.close();
+      resolve(/^y(es)?$/i.test(answer.trim()));
+    });
+  });
 }

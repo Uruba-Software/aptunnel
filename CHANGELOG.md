@@ -4,6 +4,29 @@ All notable changes to aptunnel are documented here.
 
 ---
 
+## [1.4.0] — 2026-03-31
+
+### Added
+- **`aptunnel status --watch`** — live-refresh the status table every 2 seconds.
+- **Production guard on `aptunnel all`** — when no `--env` flag is given, aptunnel opens
+  tunnels across all configured environments and warns before touching any environment whose
+  handle or alias contains `prod`, `production`, or `live`. Requires confirmation before
+  proceeding.
+
+### Changed
+- **Status screen redesigned** — databases are now grouped by environment with a header per
+  group. The ALIAS column is removed; when a database alias differs from its handle the alias
+  is shown in parentheses next to the handle (e.g. `mydb-dev (dev-db)`). The column header
+  "CONNECTION URL" is shortened to "URL".
+- **`aptunnel all` no longer requires a default environment** — it targets all environments
+  when `--env` is omitted, instead of requiring one to be set as default.
+- **`aptunnel init` no longer asks for a default environment** — the default-environment
+  prompt has been removed from both Express and Custom installs.
+- **Routing fix** — `aptunnel --env=<name>` without a subcommand now shows a clear error
+  ("Unknown flag") instead of "Unknown database".
+
+---
+
 ## [1.3.0] — 2026-04-01
 
 ### Added

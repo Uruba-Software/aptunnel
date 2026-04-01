@@ -166,39 +166,13 @@ export async function runInit(args) {
     }
   }
 
-  // ── Section D: Default environment ───────────────────────────────────────
-
-  let defaultEnvHandle = null;
-
-  if (selectedEnvs.length === 1) {
-    // Single env: set it as default automatically
-    defaultEnvHandle = selectedEnvs[0].handle;
-  } else if (installType === 'custom') {
-    console.log('');
-    console.log('Set a default environment (used when no --env flag is given):');
-    selectedEnvs.forEach((env, i) => console.log(`  [${i + 1}] ${env.handle}`));
-    console.log('  [0] None (no default)');
-    const defInput   = await ask('Default environment (0 to skip) [1]: ');
-    const defTrimmed = defInput.trim();
-    if (defTrimmed !== '0') {
-      const defIdx = parseInt(defTrimmed || '1', 10) - 1;
-      if (defIdx >= 0 && defIdx < selectedEnvs.length) {
-        defaultEnvHandle = selectedEnvs[defIdx].handle;
-      }
-    }
-  }
-  // Express with multiple envs: leave no default (user can set with aptunnel config --set-default)
-
   // ── Write config ──────────────────────────────────────────────────────────
 
   const config = {
     version:      1,
     install_type: installType,
     credentials:  { email },
-    defaults: {
-      ...(defaultEnvHandle ? { environment: defaultEnvHandle } : {}),
-      lifetime: '7d',
-    },
+    defaults:     { lifetime: '7d' },
     environments:    configEnvironments,
     tunnel_defaults: { start_port: 55550, port_increment: 1 },
   };

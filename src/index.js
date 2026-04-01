@@ -73,7 +73,7 @@ try {
 
     case 'status': {
       const { runStatus } = await import('./commands/status.js');
-      runStatus();
+      runStatus(rest);
       break;
     }
 
@@ -102,6 +102,11 @@ try {
     }
 
     default: {
+      // Catch misplaced flags (e.g. `aptunnel --env=staging dev-db`)
+      if (command.startsWith('--')) {
+        logger.error(`Unknown flag: "${command}". Did you mean: aptunnel <alias> ${command}?`);
+        process.exit(1);
+      }
       // Any other command is treated as a db alias (or "all")
       const { runTunnel } = await import('./commands/tunnel.js');
       await runTunnel([command, ...rest]);

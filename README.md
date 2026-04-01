@@ -139,8 +139,8 @@ aptunnel dev-db --close --force    # force-release port even if no PID file
 ### Open all tunnels for an environment
 
 ```bash
-aptunnel all                       # uses default environment
-aptunnel all --env=staging
+aptunnel all                       # open all environments (warns on production)
+aptunnel all --env=staging         # open all tunnels in a specific environment
 ```
 
 ### List databases
@@ -163,6 +163,7 @@ stg-db     mydb-staging         postgresql  55552   staging
 
 ```bash
 aptunnel status
+aptunnel status --watch            # live-refresh every 2 seconds
 ```
 
 ```
@@ -172,10 +173,11 @@ LOGIN STATUS
 
 TUNNELS
 
-ENVIRONMENT  DATABASE          ALIAS      PORT   STATUS  UPTIME       PID    CONNECTION URL
-──────────────────────────────────────────────────────────────────────────────────────────────
-dev          ekaredb-dev       dev-db     55554  UP      02h15m30s    12345  postgresql://aptible:xxx@localhost.aptible.in:55554/db
-dev          ekaredb-redis     dev-redis  55555  DOWN    -            -      -
+── dev (my-env-development) ─────────────────────────────────────────────────────────
+DATABASE                    PORT    STATUS  UPTIME       PID    URL
+────────────────────────────────────────────────────────────────────────────────────
+ekaredb-dev (dev-db)        55554   UP      02h15m30s    12345  postgresql://aptible:xxx@localhost.aptible.in:55554/db
+ekaredb-redis (dev-redis)   55555   DOWN    -            -      -
 ```
 
 ### Login
