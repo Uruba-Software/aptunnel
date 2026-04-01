@@ -4,6 +4,17 @@ All notable changes to aptunnel are documented here.
 
 ---
 
+## [1.4.1] — 2026-04-01
+
+### Changed
+- **Status table redesigned (again)** — single unified table with environment separator rows
+  (`── dev (my-env-dev) ───────`) spanning the full table width. All databases across all
+  environments share the same column widths and a single header row.
+- **TYPE column added** — shows the database type in abbreviated form: `pg`, `mysql`, `redis`,
+  `mssql`, `mongo`, etc.
+
+---
+
 ## [1.4.0] — 2026-03-31
 
 ### Added

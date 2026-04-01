@@ -25,6 +25,27 @@ export function runStatus(args = []) {
   }
 }
 
+// ─── Type abbreviations ───────────────────────────────────────────────────────
+
+const TYPE_ABBREV = {
+  postgresql: 'pg',
+  postgres:   'pg',
+  mysql:      'mysql',
+  redis:      'redis',
+  mssql:      'mssql',
+  mongodb:    'mongo',
+  elasticsearch: 'elastic',
+  rabbitmq:   'rabbitmq',
+  influxdb:   'influxdb',
+  memcached:  'memcached',
+};
+
+function abbrevType(type) {
+  return TYPE_ABBREV[type?.toLowerCase()] ?? (type || 'unknown');
+}
+
+// ─── Renderer ─────────────────────────────────────────────────────────────────
+
 function printStatus() {
   // ── Login status ──────────────────────────────────────────────────────────
   logger.section('LOGIN STATUS');
@@ -54,7 +75,7 @@ function printStatus() {
     return;
   }
 
-  // Group by environment handle (preserving config order)
+  // Group by environment, preserving config order
   const byEnv = new Map();
   for (const db of dbs) {
     if (!byEnv.has(db.environment)) {
@@ -63,43 +84,47 @@ function printStatus() {
     byEnv.get(db.environment).dbs.push(db);
   }
 
+  // Build display names for all dbs (handle + alias in parens when they differ)
+  const dbName = (db) =>
+    db.alias !== db.handle ? `${db.handle} (${db.alias})` : db.handle;
+
+  const allNames = dbs.map(dbName);
+  const allTypes = dbs.map(db => abbrevType(db.type));
+
+  // Compute column widths once across all databases
+  const cols = {
+    db:     Math.max(8,  ...allNames.map(n => n.length)),
+    port:   6,
+    type:   Math.max(4,  ...allTypes.map(t => t.length)),
+    status: 6,
+    uptime: 11,
+    pid:    6,
+  };
+
+  const headerParts = [
+    'DATABASE'.padEnd(cols.db),
+    'PORT'.padEnd(cols.port),
+    'TYPE'.padEnd(cols.type),
+    'STATUS'.padEnd(cols.status),
+    'UPTIME'.padEnd(cols.uptime),
+    'PID'.padEnd(cols.pid),
+    'URL',
+  ];
+  const headerLine = headerParts.join('  ');
+  const tableWidth = Math.min(headerLine.length, 140);
+
+  console.log(chalk.bold(headerLine));
+  console.log(chalk.dim('─'.repeat(tableWidth)));
+
   for (const [envHandle, { alias: envAlias, dbs: envDbs }] of byEnv) {
-    // Environment header — show alias (handle) if they differ, otherwise just the handle
+    // Environment separator row spanning the full table width
     const envLabel = envAlias !== envHandle
       ? `${envAlias} (${envHandle})`
       : envHandle;
+    const fill = '─'.repeat(Math.max(0, tableWidth - envLabel.length - 4));
+    console.log(chalk.dim(`── ${envLabel} ${fill}`));
 
-    // Database display name: handle + alias in parens when they differ
-    const dbNames = envDbs.map(db =>
-      db.alias !== db.handle ? `${db.handle} (${db.alias})` : db.handle,
-    );
-
-    const cols = {
-      db:     Math.max(8, ...dbNames.map(n => n.length)),
-      port:   6,
-      status: 6,
-      uptime: 11,
-      pid:    6,
-    };
-
-    const headerLine = [
-      'DATABASE'.padEnd(cols.db),
-      'PORT'.padEnd(cols.port),
-      'STATUS'.padEnd(cols.status),
-      'UPTIME'.padEnd(cols.uptime),
-      'PID'.padEnd(cols.pid),
-      'URL',
-    ].join('  ');
-
-    const sepWidth = Math.max(headerLine.length, envLabel.length + 6);
-    console.log(chalk.dim('── ') + chalk.bold(envLabel) + chalk.dim(' ' + '─'.repeat(Math.max(0, sepWidth - envLabel.length - 4))));
-    console.log(chalk.bold(headerLine));
-    console.log(chalk.dim('─'.repeat(Math.min(headerLine.length, 120))));
-
-    for (let i = 0; i < envDbs.length; i++) {
-      const db     = envDbs[i];
-      const dbName = dbNames[i];
-
+    for (const db of envDbs) {
       const id      = toIdentifier(db.alias);
       const running = isRunning(id);
       const pid     = running ? readPid(id) : null;
@@ -108,16 +133,15 @@ function printStatus() {
 
       const statusLabel = running ? 'UP' : 'DOWN';
       const statusStr   = running ? chalk.green('UP') : chalk.dim('DOWN');
+      const statusPad   = ' '.repeat(Math.max(0, cols.status - statusLabel.length));
       const uptimeStr   = running ? formatUptime(uptime) : '-';
       const pidStr      = pid ? String(pid) : '-';
       const urlStr      = conn?.url ? chalk.dim(conn.url) : '-';
 
-      // padEnd doesn't account for invisible ANSI escape codes — pad manually
-      const statusPad = ' '.repeat(Math.max(0, cols.status - statusLabel.length));
-
       const row = [
-        dbName.padEnd(cols.db),
+        dbName(db).padEnd(cols.db),
         String(db.port).padEnd(cols.port),
+        abbrevType(db.type).padEnd(cols.type),
         statusStr + statusPad,
         uptimeStr.padEnd(cols.uptime),
         pidStr.padEnd(cols.pid),
@@ -126,7 +150,7 @@ function printStatus() {
 
       console.log(row);
     }
-
-    console.log('');
   }
+
+  console.log('');
 }
