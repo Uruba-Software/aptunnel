@@ -4,6 +4,17 @@ All notable changes to aptunnel are documented here.
 
 ---
 
+## [1.4.6] — 2026-04-09
+
+### Fixed
+- **Auto re-login on expired/missing session** — when aptible CLI prints "not logged in" or
+  "please log in" (instead of "unauthorized"), the auth error was not detected and aptunnel
+  fell through to showing the raw aptible error message. Expanded detection to cover all
+  known aptible CLI "not authenticated" message variants so the automatic re-login flow
+  (using credentials saved during `init`) triggers correctly.
+
+---
+
 ## [1.4.5] — 2026-04-01
 
 ### Fixed

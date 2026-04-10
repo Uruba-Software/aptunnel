@@ -218,7 +218,14 @@ export function openTunnel({ dbHandle, environment, port }) {
       const lower = logContent.toLowerCase();
 
       // Fatal errors — fail immediately
-      if (lower.includes('unauthorized') || lower.includes('token has expired') || lower.includes('not authenticated')) {
+      if (
+        lower.includes('unauthorized') ||
+        lower.includes('token has expired') ||
+        lower.includes('not authenticated') ||
+        lower.includes('not logged in') ||
+        lower.includes('please log in') ||
+        lower.includes('aptible login')
+      ) {
         clearInterval(poll);
         reject(new Error('AUTH_EXPIRED'));
         return;
