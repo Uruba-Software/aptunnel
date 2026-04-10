@@ -4,6 +4,19 @@ All notable changes to aptunnel are documented here.
 
 ---
 
+## [1.4.7] — 2026-04-10
+
+### Fixed
+- **`--close` falsely warns "Port still in use" after tunnel shutdown** — `isPortInUse` used
+  `lsof -ti :<port>` which returns all processes with any socket on that port, including client
+  connections in `CLOSE_WAIT` state (e.g. a Java app that was connected to the tunnel). After
+  the aptible listener process is killed the port is no longer bound, but lingering `CLOSE_WAIT`
+  sockets on the client side triggered the spurious warning. Fixed by adding `-sTCP:LISTEN` so
+  only processes actively listening on the port are considered. CLOSE_WAIT client connections
+  are now correctly ignored.
+
+---
+
 ## [1.4.6] — 2026-04-09
 
 ### Fixed

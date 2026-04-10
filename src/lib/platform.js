@@ -53,8 +53,10 @@ export function isPortInUse(port) {
     return { inUse: false, pid: null };
   }
 
-  // Linux / macOS / WSL
-  const result = spawnSync('lsof', ['-ti', `:${port}`], { encoding: 'utf8' });
+  // Linux / macOS / WSL — restrict to LISTEN state so CLOSE_WAIT client
+  // connections (e.g. a Java process in CLOSE_WAIT after the tunnel dies)
+  // don't falsely report the port as still occupied.
+  const result = spawnSync('lsof', ['-ti', `:${port}`, '-sTCP:LISTEN'], { encoding: 'utf8' });
   if (result.status !== 0 || !result.stdout.trim()) {
     return { inUse: false, pid: null };
   }
