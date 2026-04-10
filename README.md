@@ -173,10 +173,10 @@ TUNNELS
 DATABASE                   PORT    TYPE   STATUS  UPTIME       PID    URL
 ────────────────────────────────────────────────────────────────────────────────────────────────────
 ── dev (my-env-development) ────────────────────────────────────────────────────────────────────────
-ekaredb-dev (dev-db)       55554   pg     UP      02h15m30s    12345  postgresql://aptible:xxx@...
-ekaredb-redis (dev-redis)  55555   redis  DOWN    -            -      -
+db-dev (dev-db)       55554   pg     UP      02h15m30s    12345  postgresql://aptible:xxx@...
+db-redis (dev-redis)  55555   redis  DOWN    -            -      -
 ── staging (my-env-staging) ────────────────────────────────────────────────────────────────────────
-ekaredb-staging (stg-db)   55552   pg     DOWN    -            -      -
+db-staging (stg-db)   55552   pg     DOWN    -            -      -
 ```
 
 ### Login
