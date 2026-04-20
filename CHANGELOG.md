@@ -4,6 +4,19 @@ All notable changes to aptunnel are documented here.
 
 ---
 
+## [1.4.8] — 2026-04-20
+
+### Fixed
+- **Port remains occupied after tunnel connection dies** — when aptible exits naturally (its own
+  connection limit or external kill), its SSH child process is re-parented to init and keeps
+  the port bound. Two fixes:
+  (1) `--close` now always kills the orphaned port occupant instead of just warning unless
+  `--force` was passed; (2) before opening a tunnel, if a stale PID file is found (process
+  dead but files remain), aptunnel now kills any orphaned child still holding the port and
+  cleans up the stale state automatically, so the reopen succeeds without needing `--force`.
+
+---
+
 ## [1.4.7] — 2026-04-10
 
 ### Fixed

@@ -159,6 +159,19 @@ async function openOneTunnel({ db, environment, port, id, doForce, skipRelogin =
     return { success: true };
   }
 
+  // Stale state: PID file exists but process is dead (aptible hit its own connection limit
+  // and exited naturally). Its SSH child may have been re-parented to init and still holds
+  // the port. Clean up the orphan and remove the stale files before attempting to reopen.
+  const stalePid = readPid(id);
+  if (stalePid) {
+    const stalePort = isPortInUse(port);
+    if (stalePort.inUse && stalePort.pid) {
+      killProcess(stalePort.pid);
+      await sleep(400);
+    }
+    cleanup(id);
+  }
+
   // Port in use by something else?
   const portState = isPortInUse(port);
   if (portState.inUse) {
@@ -264,13 +277,14 @@ async function closeTunnel(id, port, doForce = false) {
   cleanup(id);
 
   if (portState.inUse) {
-    if (doForce && portState.pid) {
-      // Port still occupied — force-kill whatever is holding it.
+    if (portState.pid) {
+      // Port still held — almost certainly an SSH child re-parented after aptible exited
+      // naturally (aptible's own connection limit). Kill the orphan to free the port.
       killProcess(portState.pid);
       await sleep(250);
-      logger.success(`${id} tunnel closed (port ${port} force-released).`);
+      logger.success(`${id} tunnel closed (port ${port} released).`);
     } else {
-      logger.warn(`Port ${port} still in use by PID ${portState.pid} (not aptunnel).`);
+      logger.warn(`Port ${port} still in use (PID unknown).`);
     }
   } else {
     logger.success(`${id} tunnel closed.`);
