@@ -4,6 +4,29 @@ All notable changes to aptunnel are documented here.
 
 ---
 
+## [1.6.0] — 2026-04-20
+
+### Added
+- **Aptible CLI passthrough** — aptunnel is now a full Aptible CLI wrapper. Any command
+  not handled natively is forwarded to `aptible` automatically (verbatim passthrough).
+- **Alias-resolved passthrough** — common database commands resolve your configured alias
+  to the real Aptible handle + environment automatically, so you never type handles or
+  `--environment` flags manually:
+  - `aptunnel <alias> db:backup/dump/modify/restart/url/list/versions` → injects handle + env
+  - `aptunnel <alias> backup:list` → injects handle + env
+  - `aptunnel <alias> logs` → injects `--database=<handle> --environment=<env>`
+  - Extra user-provided flags are passed through as-is
+- **Bulk passthrough with `all`** — `aptunnel all db:backup` runs the command on every
+  configured database. Write operations ask for confirmation; `--force` skips it.
+  `--env=<alias>` scopes to a single environment.
+- **Verbatim passthrough** — commands whose first argument contains `:` (e.g.
+  `aptunnel db:list --environment my-env`) are forwarded to `aptible` unchanged.
+- **Shell completions** — alias-resolved passthrough commands (`db:backup`, `db:clone`,
+  `db:dump`, `db:execute`, `db:list`, `db:modify`, `db:restart`, `db:url`, `db:versions`,
+  `backup:list`, `logs`) are now offered after `<alias>` and `all` in bash, zsh, and fish.
+
+---
+
 ## [1.5.0] — 2026-04-20
 
 ### Added

@@ -95,6 +95,28 @@ export function runHelp() {
   cmd('aptunnel config --refresh',              'Re-discover envs/dbs from Aptible');
   cmd('aptunnel config --path',                 'Print config file path');
   console.log('');
+
+  section('APTIBLE PASSTHROUGH');
+  console.log(chalk.dim('  Run any aptible command via aptunnel — alias is resolved to the real handle'));
+  console.log(chalk.dim('  and environment automatically. No need to know handles or environment names.'));
+  console.log('');
+  cmd('aptunnel <alias> <aptible-cmd> [args]',  'Run an aptible command with alias resolution');
+  cmd('aptunnel all <aptible-cmd> [--force]',   'Run command on all configured databases');
+  console.log('');
+  console.log(chalk.bold('  Alias-resolved commands:'));
+  console.log(chalk.dim('    db:backup  db:clone    db:dump     db:execute  db:list'));
+  console.log(chalk.dim('    db:modify  db:restart  db:url      db:versions backup:list  logs'));
+  console.log('');
+  console.log(chalk.bold('  Examples:'));
+  cmd('aptunnel ekaredb-prod db:backup',        '→  aptible db:backup <handle> --environment <env>');
+  cmd('aptunnel ekaredb-prod db:url',           '→  aptible db:url <handle> --environment <env>');
+  cmd('aptunnel ekaredb-prod logs',             '→  aptible logs --database <handle> --environment <env>');
+  cmd('aptunnel all db:backup',                 '→  backup every configured database (asks confirmation)');
+  cmd('aptunnel all db:backup --force',         '→  same, skips confirmation');
+  console.log('');
+  console.log(chalk.bold('  Full aptible syntax also works (verbatim passthrough):'));
+  cmd('aptunnel db:list --environment my-env',  '→  aptible db:list --environment my-env');
+  console.log('');
 }
 
 function section(title) {

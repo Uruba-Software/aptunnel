@@ -1,6 +1,6 @@
 <p align="center">
   <h1 align="center">aptunnel</h1>
-  <p align="center">Cross-platform Aptible tunnel manager — open, close and monitor multiple database tunnels with short aliases.</p>
+  <p align="center">Full-featured Aptible CLI wrapper — manage database tunnels with short aliases, plus alias-resolved passthrough for every Aptible command.</p>
 </p>
 
 <p align="center">
@@ -300,6 +300,65 @@ curl -s https://toolbelt.aptible.com/install.sh | bash
 # Windows
 # Download from https://www.aptible.com/docs/cli
 ```
+
+---
+
+## Aptible CLI Passthrough
+
+aptunnel is a full wrapper around the Aptible CLI. Any Aptible command can be run through aptunnel — if aptunnel doesn't handle it natively, it is forwarded to `aptible` automatically.
+
+### Alias-resolved commands
+
+For common database operations, aptunnel resolves your alias to the real Aptible handle and environment, so you never have to type them manually:
+
+```bash
+# Without aptunnel:
+aptible db:backup mydb-production-abc123 --environment my-company-prod-env
+
+# With aptunnel (alias configured in init):
+aptunnel mydb-prod db:backup
+```
+
+| aptunnel command | Equivalent aptible command |
+|---|---|
+| `aptunnel <alias> db:backup` | `aptible db:backup <handle> --environment <env>` |
+| `aptunnel <alias> db:dump` | `aptible db:dump <handle> --environment <env>` |
+| `aptunnel <alias> db:url` | `aptible db:url <handle> --environment <env>` |
+| `aptunnel <alias> db:restart` | `aptible db:restart <handle> --environment <env>` |
+| `aptunnel <alias> db:modify` | `aptible db:modify <handle> --environment <env>` |
+| `aptunnel <alias> db:list` | `aptible db:list --environment <env>` |
+| `aptunnel <alias> db:versions` | `aptible db:versions <handle> --environment <env>` |
+| `aptunnel <alias> backup:list` | `aptible backup:list <handle> --environment <env>` |
+| `aptunnel <alias> logs` | `aptible logs --database <handle> --environment <env>` |
+
+Extra flags are passed through as-is:
+
+```bash
+aptunnel mydb-prod db:restart --container-size 1024
+```
+
+### Bulk operations with `all`
+
+Run any command on every configured database at once. Read-only commands run immediately; write operations ask for confirmation first:
+
+```bash
+aptunnel all db:backup              # backs up all databases (confirmation prompt)
+aptunnel all db:backup --force      # skip confirmation
+aptunnel all db:list                # list databases in all environments (no prompt)
+aptunnel all db:backup --env=prod   # only databases in the prod environment
+```
+
+### Verbatim passthrough
+
+Any command aptunnel doesn't recognise is forwarded to the Aptible CLI verbatim — no alias resolution, no modifications:
+
+```bash
+aptunnel db:list --environment my-env       # forwarded as-is to aptible
+aptunnel environment:list                   # forwarded as-is to aptible
+aptunnel operation:follow 12345             # forwarded as-is to aptible
+```
+
+Tab completion is available for alias-resolved commands. For verbatim passthrough, use the Aptible CLI syntax directly.
 
 ---
 

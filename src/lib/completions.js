@@ -103,6 +103,20 @@ _aptunnel_completions() {
     return 0
   fi
 
+  local passthrough_cmds="db:backup db:clone db:dump db:execute db:list db:modify db:restart db:url db:versions backup:list logs"
+
+  # After 'all', offer passthrough subcommands
+  if [[ "$cmd" == "all" ]]; then
+    COMPREPLY=( $(compgen -W "$passthrough_cmds" -- "$cur") )
+    return 0
+  fi
+
+  # After a db alias, offer passthrough subcommands (if not already a subcommand context)
+  if [[ -n "$cmd" && " \$all_dbs " == *" $cmd "* ]]; then
+    COMPREPLY=( $(compgen -W "$passthrough_cmds" -- "$cur") )
+    return 0
+  fi
+
   # Subcommand-specific positional completions
   case "$cmd" in
     completions)
@@ -168,9 +182,10 @@ _aptunnel() {
         all)
           _arguments \\
             '--close[Close all tunnels]' \\
-            '--force[Force port selection on conflict]' \\
+            '--force[Force port selection / skip confirmation]' \\
             "--env=[Target environment]:environment:(\$all_envs)" \\
-            '--alive=[Auto-close after N hours (1-24 or max)]:hours:(1 2 4 6 8 12 16 20 24 max)'
+            '--alive=[Auto-close after N hours (1-24 or max)]:hours:(1 2 4 6 8 12 16 20 24 max)' \\
+            '1:aptible command:(db:backup db:clone db:dump db:execute db:list db:modify db:restart db:url db:versions backup:list logs)'
           ;;
         status)
           _arguments '--watch[Live-refresh every 2 seconds]'
@@ -205,7 +220,8 @@ _aptunnel() {
             '--force[Auto-select free port on conflict]' \\
             '--port=[Override local port for this session]: :' \\
             "--env=[Target a different environment]:environment:(\$all_envs)" \\
-            '--alive=[Auto-close after N hours (1-24 or max)]:hours:(1 2 4 6 8 12 16 20 24 max)'
+            '--alive=[Auto-close after N hours (1-24 or max)]:hours:(1 2 4 6 8 12 16 20 24 max)' \\
+            '1:aptible command:(db:backup db:clone db:dump db:execute db:list db:modify db:restart db:url db:versions backup:list logs)'
           ;;
       esac
       ;;
@@ -256,9 +272,15 @@ complete -c aptunnel -f -n '__fish_seen_subcommand_from completions' -a 'zsh'   
 complete -c aptunnel -f -n '__fish_seen_subcommand_from completions' -a 'fish'    -d 'Fish completion script'
 complete -c aptunnel -f -n '__fish_seen_subcommand_from completions' -a 'install' -d 'Auto-install for current shell'
 
+# Passthrough subcommands (after a db alias or 'all')
+set -l _passthrough_cmds 'db:backup db:clone db:dump db:execute db:list db:modify db:restart db:url db:versions backup:list logs'
+for _subcmd in $_passthrough_cmds
+  complete -c aptunnel -f -n '__fish_seen_subcommand_from all (__aptunnel_dbs)' -a $_subcmd -d 'Aptible command'
+end
+
 # Global tunnel flags
 complete -c aptunnel -l close -d 'Close tunnel(s)'
-complete -c aptunnel -l force -d 'Force port selection / release'
+complete -c aptunnel -l force -d 'Force port selection / skip confirmation'
 complete -c aptunnel -l port  -d 'Override local port' -r
 complete -c aptunnel -l env   -d 'Target environment' -r -a '(__aptunnel_envs)'
 complete -c aptunnel -l alive -d 'Auto-close after N hours' -r -a '1 2 4 6 8 12 16 20 24 max'

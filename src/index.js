@@ -120,7 +120,26 @@ try {
         logger.error(`Unknown flag: "${command}". Did you mean: aptunnel <alias> ${command}?`);
         process.exit(1);
       }
-      // Any other command is treated as a db alias (or "all")
+
+      // Pure passthrough: first arg is itself an aptible command (e.g. `aptunnel db:list`)
+      if (command.includes(':')) {
+        const { spawnVerbatim } = await import('./commands/passthrough.js');
+        await spawnVerbatim([command, ...rest]);
+        break;
+      }
+
+      // Alias-resolved passthrough: rest contains an aptible subcommand
+      const { isAptibleSubcmd } = await import('./commands/passthrough.js');
+      const doForce   = rest.includes('--force');
+      const hasSubcmd = rest.some(isAptibleSubcmd);
+
+      if (hasSubcmd) {
+        const { runPassthrough } = await import('./commands/passthrough.js');
+        await runPassthrough({ target: command, args: rest, doForce });
+        break;
+      }
+
+      // Default: tunnel open/close (or "all" tunnels)
       const { runTunnel } = await import('./commands/tunnel.js');
       await runTunnel([command, ...rest]);
       break;
