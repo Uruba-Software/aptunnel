@@ -1,4 +1,7 @@
 import { createInterface } from 'readline';
+import { spawn } from 'child_process';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import { logger } from '../lib/logger.js';
 import { isInstalled, openTunnel, login } from '../lib/aptible.js';
 import {
@@ -7,9 +10,12 @@ import {
 import { isPortInUse, killProcess } from '../lib/platform.js';
 import {
   isRunning, readPid, readConnectionInfo, saveConnectionInfo, savePid,
-  cleanup, toIdentifier, logFilePath,
+  cleanup, toIdentifier, logFilePath, saveWatchdogPid, readWatchdogPid, getTempDir,
 } from '../lib/process-manager.js';
 import chalk from 'chalk';
+
+const APTIBLE_MAX_HOURS = 24;
+const WATCHDOG_PATH = join(dirname(fileURLToPath(import.meta.url)), '../lib/watchdog.js');
 
 // ─── Entry point ──────────────────────────────────────────────────────────────
 
@@ -24,17 +30,24 @@ export async function runTunnel(args) {
   const doForce   = args.includes('--force');
   const portArg   = parseFlag(args, '--port');
   const envArg    = parseFlag(args, '--env');
+  const aliveArg  = parseFlag(args, '--alive');
+  const aliveHours = parseAliveHours(aliveArg);
+
+  if (aliveHours !== null && aliveHours instanceof Error) {
+    logger.error(aliveHours.message);
+    process.exit(1);
+  }
 
   if (target === 'all') {
-    await handleAll({ doClose, envArg, doForce });
+    await handleAll({ doClose, envArg, doForce, aliveHours });
   } else {
-    await handleOne({ alias: target, doClose, doForce, portOverride: portArg ? Number(portArg) : null, envOverride: envArg });
+    await handleOne({ alias: target, doClose, doForce, portOverride: portArg ? Number(portArg) : null, envOverride: envArg, aliveHours });
   }
 }
 
 // ─── Single tunnel ────────────────────────────────────────────────────────────
 
-async function handleOne({ alias, doClose, doForce, portOverride, envOverride }) {
+async function handleOne({ alias, doClose, doForce, portOverride, envOverride, aliveHours }) {
   const db = getDatabase(alias);
   if (!db) {
     logger.error(`Unknown database: "${alias}". Run \`aptunnel status\` or \`aptunnel --help\` to see available aliases.`);
@@ -54,14 +67,14 @@ async function handleOne({ alias, doClose, doForce, portOverride, envOverride })
     return;
   }
 
-  await openOneTunnel({ db, environment, port, id, doForce });
+  await openOneTunnel({ db, environment, port, id, doForce, aliveHours });
 }
 
 // ─── All tunnels ──────────────────────────────────────────────────────────────
 
 const PROD_RE = /\b(prod|production|live)\b/i;
 
-async function handleAll({ doClose, envArg, doForce }) {
+async function handleAll({ doClose, envArg, doForce, aliveHours }) {
   let targets;
   let envDesc;
 
@@ -123,6 +136,7 @@ async function handleAll({ doClose, envArg, doForce }) {
       port: db.port,
       id,
       doForce,
+      aliveHours,
       skipRelogin: sessionValid,
       silent: false,
     });
@@ -150,7 +164,7 @@ async function handleAll({ doClose, envArg, doForce }) {
 
 // ─── Core open logic ──────────────────────────────────────────────────────────
 
-async function openOneTunnel({ db, environment, port, id, doForce, skipRelogin = false, silent = false }) {
+async function openOneTunnel({ db, environment, port, id, doForce, aliveHours = null, skipRelogin = false, silent = false }) {
   // Already running?
   if (isRunning(id)) {
     const conn = readConnectionInfo(id);
@@ -161,9 +175,13 @@ async function openOneTunnel({ db, environment, port, id, doForce, skipRelogin =
 
   // Stale state: PID file exists but process is dead (aptible hit its own connection limit
   // and exited naturally). Its SSH child may have been re-parented to init and still holds
-  // the port. Clean up the orphan and remove the stale files before attempting to reopen.
+  // the port. Also kill any lingering watchdog so it doesn't fire against the new tunnel.
   const stalePid = readPid(id);
   if (stalePid) {
+    const staleWatchdog = readWatchdogPid(id);
+    if (staleWatchdog) {
+      try { process.kill(staleWatchdog, 'SIGKILL'); } catch { /* already gone */ }
+    }
     const stalePort = isPortInUse(port);
     if (stalePort.inUse && stalePort.pid) {
       killProcess(stalePort.pid);
@@ -197,6 +215,7 @@ async function openOneTunnel({ db, environment, port, id, doForce, skipRelogin =
       const result = await openTunnel({ dbHandle: db.handle, environment, port });
 
       savePid(id, result.pid);
+      const ttlExpiresAt = aliveHours ? Date.now() + aliveHours * 3_600_000 : null;
       saveConnectionInfo(id, {
         url:      result.connectionUrl,
         host:     result.credentials.host,
@@ -204,7 +223,18 @@ async function openOneTunnel({ db, environment, port, id, doForce, skipRelogin =
         user:     result.credentials.user,
         password: result.credentials.password,
         dbName:   result.credentials.dbName,
+        ttl_expires_at: ttlExpiresAt,
       });
+
+      if (aliveHours) {
+        const watcher = spawn(
+          process.execPath,
+          [WATCHDOG_PATH, String(result.pid), String(aliveHours * 3_600_000), getTempDir(), id],
+          { detached: true, stdio: 'ignore' },
+        );
+        watcher.unref();
+        saveWatchdogPid(id, watcher.pid);
+      }
 
       spinner.succeed(`${db.alias} tunnel opened`);
       printConnectionInfo(db.alias, port, readConnectionInfo(id));
@@ -265,6 +295,12 @@ async function closeTunnel(id, port, doForce = false) {
     return;
   }
 
+  // Kill the watchdog timer (if any) before killing the tunnel process.
+  const watchdogPid = readWatchdogPid(id);
+  if (watchdogPid) {
+    try { process.kill(watchdogPid, 'SIGKILL'); } catch { /* already gone */ }
+  }
+
   killProcess(pid);
 
   // Poll until the port is released (up to ~2 s in 250 ms steps).
@@ -317,6 +353,20 @@ function findFreePort(startPort, maxTries = 20) {
 function parseFlag(args, flag) {
   const entry = args.find(a => a.startsWith(`${flag}=`));
   return entry ? entry.slice(flag.length + 1) : null;
+}
+
+// Returns: null (no flag), Error (invalid), or number (hours, 1–24)
+function parseAliveHours(raw) {
+  if (raw === null || raw === undefined) return null;
+  if (raw === 'max') return APTIBLE_MAX_HOURS;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) {
+    return new Error(`--alive: invalid value "${raw}". Use a positive number of hours or "max" (${APTIBLE_MAX_HOURS}h).`);
+  }
+  if (n > APTIBLE_MAX_HOURS) {
+    return new Error(`--alive: ${n}h exceeds Aptible's ${APTIBLE_MAX_HOURS}h tunnel limit. Use --alive=max for the maximum.`);
+  }
+  return n;
 }
 
 function sleep(ms) {

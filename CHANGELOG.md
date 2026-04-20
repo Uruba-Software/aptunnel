@@ -4,6 +4,20 @@ All notable changes to aptunnel are documented here.
 
 ---
 
+## [1.5.0] — 2026-04-20
+
+### Added
+- **`--alive=<N>` flag** — auto-close a tunnel after N hours (e.g. `--alive=12`, `--alive=24`,
+  `--alive=max`). Aptible imposes a hard 24-hour limit on all `db:tunnel` connections; `--alive=max`
+  maps to 24 h. A lightweight watchdog process is spawned in the background at open time; it kills
+  the tunnel and cleans up state files when the TTL expires. Works with single tunnels and `all`.
+- **ALIVE column in `aptunnel status`** — when a TTL is set, shows remaining time (cyan) or
+  `EXPIRED` (red); dashes when no TTL.
+- **Shell completions** — `--alive=` with suggested values (`1 2 4 6 8 12 16 20 24 max`) for
+  bash, zsh, and fish.
+
+---
+
 ## [1.4.8] — 2026-04-20
 
 ### Fixed

@@ -42,6 +42,14 @@ _aptunnel_completions() {
     return 0
   fi
 
+  # --alive=<N> or --alive=max
+  if [[ "\${cur}" == "--alive="* ]]; then
+    local pfx="\${cur#--alive=}"
+    COMPREPLY=( $(compgen -W "1 2 4 6 8 12 16 20 24 max" -- "$pfx") )
+    COMPREPLY=( "\${COMPREPLY[@]/#/--alive=}" )
+    return 0
+  fi
+
   # Free-form value flags — suppress completion
   if [[ "\${cur}" == "--port="* || "\${cur}" == "--email="* || "\${cur}" == "--password="* || "\${cur}" == "--lifetime="* ]]; then
     return 0
@@ -74,14 +82,14 @@ _aptunnel_completions() {
   if [[ "\${cur}" == -* ]]; then
     local flags
     case "$cmd" in
-      all)        flags="--close --force --env=" ;;
+      all)        flags="--close --force --env= --alive=" ;;
       status)     flags="--watch" ;;
       login)      flags="--email= --password= --lifetime= --status" ;;
       config)     flags="--set-port --set-default --refresh --path --raw" ;;
       dbs)        flags="--env=" ;;
       uninstall)  flags="--force" ;;
       "")         flags="--help --version" ;;
-      *)          flags="--close --force --port= --env=" ;;
+      *)          flags="--close --force --port= --env= --alive=" ;;
     esac
     COMPREPLY=( $(compgen -W "\$flags" -- "$cur") )
     # Don't add a trailing space when the completion ends with '='
@@ -161,7 +169,8 @@ _aptunnel() {
           _arguments \\
             '--close[Close all tunnels]' \\
             '--force[Force port selection on conflict]' \\
-            "--env=[Target environment]:environment:(\$all_envs)"
+            "--env=[Target environment]:environment:(\$all_envs)" \\
+            '--alive=[Auto-close after N hours (1-24 or max)]:hours:(1 2 4 6 8 12 16 20 24 max)'
           ;;
         status)
           _arguments '--watch[Live-refresh every 2 seconds]'
@@ -195,7 +204,8 @@ _aptunnel() {
             '--close[Close this tunnel]' \\
             '--force[Auto-select free port on conflict]' \\
             '--port=[Override local port for this session]: :' \\
-            "--env=[Target a different environment]:environment:(\$all_envs)"
+            "--env=[Target a different environment]:environment:(\$all_envs)" \\
+            '--alive=[Auto-close after N hours (1-24 or max)]:hours:(1 2 4 6 8 12 16 20 24 max)'
           ;;
       esac
       ;;
@@ -251,6 +261,7 @@ complete -c aptunnel -l close -d 'Close tunnel(s)'
 complete -c aptunnel -l force -d 'Force port selection / release'
 complete -c aptunnel -l port  -d 'Override local port' -r
 complete -c aptunnel -l env   -d 'Target environment' -r -a '(__aptunnel_envs)'
+complete -c aptunnel -l alive -d 'Auto-close after N hours' -r -a '1 2 4 6 8 12 16 20 24 max'
 
 # status
 complete -c aptunnel -n '__fish_seen_subcommand_from status' -l watch -d 'Live-refresh every 2 seconds'

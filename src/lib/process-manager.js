@@ -4,15 +4,16 @@ import { tmpdir } from 'os';
 import { getProcessInfo, getProcessUptime } from './platform.js';
 
 // Allow tests to redirect temp files to an isolated directory
-function getTempDir() {
+export function getTempDir() {
   return process.env.APTUNNEL_TEMP_DIR ?? tmpdir();
 }
 
 // ─── Path helpers ─────────────────────────────────────────────────────────────
 
-export function pidFilePath(identifier)  { return join(getTempDir(), `aptunnel-${identifier}.pid`); }
-export function logFilePath(identifier)  { return join(getTempDir(), `aptunnel-${identifier}.log`); }
-export function connFilePath(identifier) { return join(getTempDir(), `aptunnel-${identifier}.conn.json`); }
+export function pidFilePath(identifier)   { return join(getTempDir(), `aptunnel-${identifier}.pid`); }
+export function logFilePath(identifier)   { return join(getTempDir(), `aptunnel-${identifier}.log`); }
+export function connFilePath(identifier)  { return join(getTempDir(), `aptunnel-${identifier}.conn.json`); }
+export function watchFilePath(identifier) { return join(getTempDir(), `aptunnel-${identifier}.watch.pid`); }
 
 // ─── PID management ───────────────────────────────────────────────────────────
 
@@ -29,6 +30,22 @@ export function readPid(identifier) {
 
 export function removePid(identifier) {
   const path = pidFilePath(identifier);
+  if (existsSync(path)) unlinkSync(path);
+}
+
+export function saveWatchdogPid(identifier, pid) {
+  writeFileSync(watchFilePath(identifier), String(pid), { mode: 0o600 });
+}
+
+export function readWatchdogPid(identifier) {
+  const path = watchFilePath(identifier);
+  if (!existsSync(path)) return null;
+  const val = parseInt(readFileSync(path, 'utf8').trim(), 10);
+  return isNaN(val) ? null : val;
+}
+
+export function removeWatchdogPid(identifier) {
+  const path = watchFilePath(identifier);
   if (existsSync(path)) unlinkSync(path);
 }
 
@@ -104,11 +121,12 @@ export function getAllRunningTunnels() {
 }
 
 /**
- * Clean up PID + conn files for a given identifier.
+ * Clean up PID + conn + watchdog files for a given identifier.
  */
 export function cleanup(identifier) {
   removePid(identifier);
   removeConnectionInfo(identifier);
+  removeWatchdogPid(identifier);
 }
 
 /**

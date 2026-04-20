@@ -29,6 +29,24 @@ export function runStatus(args = []) {
   }
 }
 
+// ─── TTL helpers ──────────────────────────────────────────────────────────────
+
+function formatTTL(ttlExpiresAt) {
+  if (!ttlExpiresAt) return '-';
+  const remaining = ttlExpiresAt - Date.now();
+  if (remaining <= 0) return chalk.red('EXPIRED');
+  const totalMin = Math.ceil(remaining / 60_000);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  const label = h > 0 ? `${h}h${String(m).padStart(2, '0')}m` : `${m}m`;
+  return remaining < 3_600_000 ? chalk.yellow(label) : chalk.cyan(label);
+}
+
+// Strip ANSI escape codes to get printable length for column padding.
+function stripAnsi(str) {
+  return str.replace(/\x1B\[[0-9;]*m/g, '');
+}
+
 // ─── Type abbreviations ───────────────────────────────────────────────────────
 
 const TYPE_ABBREV = {
@@ -102,6 +120,7 @@ function printStatus() {
     type:   Math.max(4,  ...allTypes.map(t => t.length)),
     status: 6,
     uptime: 11,
+    alive:  8,
     pid:    6,
   };
 
@@ -111,6 +130,7 @@ function printStatus() {
     'TYPE'.padEnd(cols.type),
     'STATUS'.padEnd(cols.status),
     'UPTIME'.padEnd(cols.uptime),
+    'ALIVE'.padEnd(cols.alive),
     'PID'.padEnd(cols.pid),
     'URL',
   ];
@@ -139,6 +159,7 @@ function printStatus() {
       const statusStr   = running ? chalk.green('UP') : chalk.dim('DOWN');
       const statusPad   = ' '.repeat(Math.max(0, cols.status - statusLabel.length));
       const uptimeStr   = running ? formatUptime(uptime) : '-';
+      const aliveStr    = formatTTL(conn?.ttl_expires_at);
       const pidStr      = pid ? String(pid) : '-';
       const urlStr      = conn?.url ? chalk.dim(conn.url) : '-';
 
@@ -148,6 +169,7 @@ function printStatus() {
         abbrevType(db.type).padEnd(cols.type),
         statusStr + statusPad,
         uptimeStr.padEnd(cols.uptime),
+        aliveStr.padEnd(cols.alive + aliveStr.length - stripAnsi(aliveStr).length),
         pidStr.padEnd(cols.pid),
         urlStr,
       ].join('  ');
