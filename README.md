@@ -32,6 +32,9 @@ aptunnel uninstall       # clean uninstall (stops tunnels, removes config, runs 
 
 ## Requirements
 
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+
+
 - **[Node.js](https://nodejs.org)** 18+
 - **[Aptible CLI](https://www.aptible.com/docs/cli)** installed and in your PATH
 
