@@ -203,6 +203,18 @@ aptunnel config --set-port dev-db 5433
 aptunnel config --set-default staging
 aptunnel config --refresh          # re-discover environments/databases
 aptunnel config --path             # print config file path
+aptunnel config --set-hook post_login "<command>"   # run a command after every successful login
+aptunnel config --clear-hook post_login
+```
+
+### Hooks
+
+`hooks.post_login` runs after every successful login: `aptunnel login`, `aptunnel init`, and the automatic re-login when a tunnel finds the token expired. The command runs through your shell with `APTUNNEL_TOKEN_FILE` set to the Aptible token file (`~/.aptible/tokens.json`). A failing hook prints a warning; the login itself still succeeds. Hooks are kept when you re-run `aptunnel init`.
+
+Example: copy the fresh token to a server that runs scheduled Aptible jobs.
+
+```bash
+aptunnel config --set-hook post_login 'ssh my-server "umask 077; mkdir -p ~/.aptible; cat > ~/.aptible/tokens.json" < "$APTUNNEL_TOKEN_FILE"'
 ```
 
 ### Uninstall

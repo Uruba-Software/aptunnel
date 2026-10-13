@@ -55,6 +55,12 @@ _aptunnel_completions() {
     return 0
   fi
 
+  # --set-hook / --clear-hook <name>
+  if [[ "$prev" == "--set-hook" || "$prev" == "--clear-hook" ]]; then
+    COMPREPLY=( $(compgen -W "post_login" -- "$cur") )
+    return 0
+  fi
+
   # --set-default <env> (space-separated form)
   if [[ "$prev" == "--set-default" ]]; then
     COMPREPLY=( $(compgen -W "$all_envs" -- "$cur") )
@@ -85,7 +91,7 @@ _aptunnel_completions() {
       all)        flags="--close --force --env= --alive=" ;;
       status)     flags="--watch" ;;
       login)      flags="--email= --password= --lifetime= --status" ;;
-      config)     flags="--set-port --set-default --refresh --path --raw" ;;
+      config)     flags="--set-port --set-default --set-hook --clear-hook --refresh --path --raw" ;;
       dbs)        flags="--env=" ;;
       uninstall)  flags="--force" ;;
       "")         flags="--help --version" ;;
@@ -201,6 +207,8 @@ _aptunnel() {
           _arguments \\
             "--set-port[Set local port for a database]:database:(\$all_dbs)" \\
             "--set-default[Set default environment]:environment:(\$all_envs)" \\
+            '--set-hook[Set a hook command]:hook:(post_login)' \\
+            '--clear-hook[Remove a hook]:hook:(post_login)' \\
             '--refresh[Re-discover environments and databases]' \\
             '--path[Print config file path]' \\
             '--raw[Include password in output]'
@@ -297,6 +305,8 @@ complete -c aptunnel -n '__fish_seen_subcommand_from login' -l status   -d 'Show
 # config
 complete -c aptunnel -n '__fish_seen_subcommand_from config' -l set-port    -d 'Set port for a database' -r -a '(__aptunnel_dbs)'
 complete -c aptunnel -n '__fish_seen_subcommand_from config' -l set-default -d 'Set default environment' -r -a '(__aptunnel_envs)'
+complete -c aptunnel -n '__fish_seen_subcommand_from config' -l set-hook    -d 'Set a hook command' -r -a 'post_login'
+complete -c aptunnel -n '__fish_seen_subcommand_from config' -l clear-hook  -d 'Remove a hook' -r -a 'post_login'
 complete -c aptunnel -n '__fish_seen_subcommand_from config' -l refresh     -d 'Re-discover databases'
 complete -c aptunnel -n '__fish_seen_subcommand_from config' -l path        -d 'Print config file path'
 complete -c aptunnel -n '__fish_seen_subcommand_from config' -l raw         -d 'Include password in output'

@@ -5,6 +5,7 @@ import {
   exists, load, save, getConfigPath, setPort, getDefaultEnv, getAllTunnelTargets,
 } from '../lib/config-manager.js';
 import { listEnvironments, listDatabases } from '../lib/aptible.js';
+import { HOOK_NAMES } from '../lib/hooks.js';
 
 export async function runConfig(args) {
   if (!exists() && !args.includes('--path')) {
@@ -50,6 +51,38 @@ export async function runConfig(args) {
     config.defaults.environment = handle;
     save(config);
     logger.success(`Default environment set to "${handle}".`);
+    return;
+  }
+
+  const setHookArg = args.indexOf('--set-hook');
+  if (setHookArg !== -1) {
+    const name    = args[setHookArg + 1];
+    const command = args[setHookArg + 2];
+    if (!HOOK_NAMES.includes(name) || !command) {
+      logger.error(`Usage: aptunnel config --set-hook <${HOOK_NAMES.join('|')}> "<command>"`);
+      process.exit(1);
+    }
+    const config = load();
+    config.hooks = { ...(config.hooks ?? {}), [name]: command };
+    save(config);
+    logger.success(`Hook "${name}" set.`);
+    return;
+  }
+
+  const clearHookArg = args.indexOf('--clear-hook');
+  if (clearHookArg !== -1) {
+    const name = args[clearHookArg + 1];
+    if (!HOOK_NAMES.includes(name)) {
+      logger.error(`Usage: aptunnel config --clear-hook <${HOOK_NAMES.join('|')}>`);
+      process.exit(1);
+    }
+    const config = load();
+    if (config.hooks) {
+      delete config.hooks[name];
+      if (Object.keys(config.hooks).length === 0) delete config.hooks;
+    }
+    save(config);
+    logger.success(`Hook "${name}" cleared.`);
     return;
   }
 

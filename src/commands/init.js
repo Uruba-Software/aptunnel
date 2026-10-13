@@ -3,6 +3,7 @@ import { logger } from '../lib/logger.js';
 import { isInstalled, login, listEnvironments, listDatabases } from '../lib/aptible.js';
 import { installInstructions } from '../lib/platform.js';
 import { installCompletions } from '../lib/completions.js';
+import { runPostLoginHook, readHooks } from '../lib/hooks.js';
 import {
   exists, save, savePassword, getConfigDir, getConfigPath, nextAvailablePort, getInstallType,
 } from '../lib/config-manager.js';
@@ -58,6 +59,7 @@ export async function runInit(args) {
     process.exit(1);
   }
   logger.success('Logged in successfully.');
+  runPostLoginHook();
   console.log('');
 
   // ── Section B: Environment discovery & selection ──────────────────────────
@@ -169,6 +171,8 @@ export async function runInit(args) {
 
   // ── Write config ──────────────────────────────────────────────────────────
 
+  // Keep user-defined hooks across re-init
+  const priorHooks = readHooks();
   const config = {
     version:      1,
     install_type: installType,
@@ -176,6 +180,7 @@ export async function runInit(args) {
     defaults:     { lifetime: '7d' },
     environments:    configEnvironments,
     tunnel_defaults: { start_port: 55550, port_increment: 1 },
+    ...(priorHooks ? { hooks: priorHooks } : {}),
   };
 
   closeRL();

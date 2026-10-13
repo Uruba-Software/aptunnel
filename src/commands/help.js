@@ -94,6 +94,8 @@ export function runHelp() {
   cmd('aptunnel config --set-default <env>',    'Change default environment');
   cmd('aptunnel config --refresh',              'Re-discover envs/dbs from Aptible');
   cmd('aptunnel config --path',                 'Print config file path');
+  cmd('aptunnel config --set-hook post_login "<cmd>"', 'Run a command after every successful login');
+  cmd('aptunnel config --clear-hook post_login', 'Remove the post_login hook');
   console.log('');
 
   section('APTIBLE PASSTHROUGH');

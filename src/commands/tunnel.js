@@ -8,6 +8,7 @@ import {
   getDatabase, getAllTunnelTargets, getAllDatabases, readPassword, load, getEnvironment,
 } from '../lib/config-manager.js';
 import { isPortInUse, killProcess } from '../lib/platform.js';
+import { runPostLoginHook } from '../lib/hooks.js';
 import {
   isRunning, readPid, readConnectionInfo, saveConnectionInfo, savePid,
   cleanup, toIdentifier, logFilePath, saveWatchdogPid, readWatchdogPid, getTempDir,
@@ -254,6 +255,7 @@ async function openOneTunnel({ db, environment, port, id, doForce, aliveHours = 
           spinner.fail('Re-authentication failed. Run `aptunnel login`.');
           return { success: false, reason: 're-authentication failed — run `aptunnel login`' };
         }
+        runPostLoginHook();
         return attempt(true);
       }
 

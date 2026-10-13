@@ -4,6 +4,7 @@ import { logger } from '../lib/logger.js';
 import { isInstalled, login, getTokenInfo } from '../lib/aptible.js';
 import { exists, load, savePassword } from '../lib/config-manager.js';
 import { installInstructions } from '../lib/platform.js';
+import { runPostLoginHook } from '../lib/hooks.js';
 
 export async function runLogin(args) {
   if (!isInstalled()) {
@@ -51,6 +52,7 @@ export async function runLogin(args) {
 
   logger.success('Logged in successfully.');
   printTokenStatus();
+  runPostLoginHook();
 }
 
 // ─── Token status display ─────────────────────────────────────────────────────

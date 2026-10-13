@@ -4,6 +4,21 @@ All notable changes to aptunnel are documented here.
 
 ---
 
+## [1.7.0] — 2026-10-13
+
+### Added
+- **`post_login` hook** — set `hooks.post_login` to a shell command that runs after every
+  successful login (`aptunnel login`, `aptunnel init`, and auto re-login on expired tokens).
+  The command gets `APTUNNEL_TOKEN_FILE` pointing at `~/.aptible/tokens.json`. A failing
+  hook only warns; the login still succeeds.
+- `aptunnel config --set-hook post_login "<command>"` and `aptunnel config --clear-hook post_login`,
+  with bash, zsh and fish completions.
+
+### Changed
+- `aptunnel init` keeps existing hooks when it rewrites the config.
+
+---
+
 ## [1.6.0] — 2026-04-20
 
 ### Added
